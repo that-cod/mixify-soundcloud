@@ -1,11 +1,11 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Music2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { supabase, STORAGE_BUCKET, createBucketIfNotExists } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AudioUploaderProps {
@@ -17,7 +17,35 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [bucketReady, setBucketReady] = useState(false);
   const { toast } = useToast();
+
+  // Check if our storage bucket exists when component mounts
+  useEffect(() => {
+    const checkBucket = async () => {
+      console.log(`Initializing AudioUploader for track ${trackNumber}...`);
+      try {
+        const created = await createBucketIfNotExists(STORAGE_BUCKET, true);
+        setBucketReady(created);
+        
+        if (!created) {
+          console.error(`Failed to ensure bucket "${STORAGE_BUCKET}" exists`);
+          toast({
+            title: "Storage Setup Issue",
+            description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project.`,
+            variant: "destructive",
+          });
+        } else {
+          console.log(`Bucket "${STORAGE_BUCKET}" is ready for use`);
+        }
+      } catch (err) {
+        console.error('Error setting up storage bucket:', err);
+        setBucketReady(false);
+      }
+    };
+    
+    checkBucket();
+  }, [toast, trackNumber]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
@@ -42,8 +70,14 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       return;
     }
     
+    console.log(`File selected for track ${trackNumber}:`, {
+      name: selectedFile.name,
+      type: selectedFile.type,
+      size: `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`
+    });
+    
     setFile(selectedFile);
-  }, [toast]);
+  }, [toast, trackNumber]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -55,6 +89,14 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
 
   const uploadFile = async () => {
     if (!file) return;
+    if (!bucketReady) {
+      toast({
+        title: "Storage not ready",
+        description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project.`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setUploading(true);
@@ -63,7 +105,14 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       // Create unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `audio/${fileName}`;
+      const filePath = `track-${trackNumber}/${fileName}`;
+      
+      console.log(`Starting upload for track ${trackNumber}:`, { 
+        bucketName: STORAGE_BUCKET,
+        filePath,
+        fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        fileType: file.type 
+      });
       
       // Track upload progress through intervals
       const progressInterval = setInterval(() => {
@@ -76,16 +125,9 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
         });
       }, 500);
       
-      console.log('Starting upload to Supabase', { 
-        bucketName: 'public',
-        filePath,
-        fileSize: file.size,
-        fileType: file.type 
-      });
-      
       // Upload to Supabase storage bucket
       const { data, error } = await supabase.storage
-        .from('public')
+        .from(STORAGE_BUCKET)
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true // Set to true to replace existing files
@@ -95,20 +137,20 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       clearInterval(progressInterval);
       
       if (error) {
-        console.error('Supabase upload error:', error);
+        console.error(`Supabase upload error for track ${trackNumber}:`, error);
         throw error;
       }
       
-      console.log('Upload successful, getting public URL');
+      console.log(`Upload successful for track ${trackNumber}:`, data);
       setProgress(95);
       
       // Get public URL
       const { data: urlData } = supabase
         .storage
-        .from('public')
+        .from(STORAGE_BUCKET)
         .getPublicUrl(filePath);
       
-      console.log('Public URL obtained:', urlData);
+      console.log(`Public URL obtained for track ${trackNumber}:`, urlData);
       setProgress(100);
       
       // Notify parent component
@@ -119,7 +161,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
         description: `Track ${trackNumber} uploaded successfully.`,
       });
     } catch (error: any) {
-      console.error('Error uploading file:', error);
+      console.error(`Error uploading file for track ${trackNumber}:`, error);
       toast({
         title: "Upload failed",
         description: error.message || "An error occurred during upload.",
@@ -194,6 +236,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
               onClick={uploadFile} 
               className="w-full bg-mixify-purple hover:bg-mixify-purple-dark"
               size="sm"
+              disabled={!bucketReady}
             >
               Upload Track {trackNumber}
             </Button>
