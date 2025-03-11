@@ -9,9 +9,10 @@ import { PlaybackControls } from '@/components/mixer/PlaybackControls';
 import { TrackAnalysis } from '@/components/mixer/TrackAnalysis';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MicIcon, Loader2 } from 'lucide-react';
+import { MicIcon, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import WaveSurfer from 'wavesurfer.js';
+import { createBucketIfNotExists, STORAGE_BUCKET } from '@/lib/supabase';
 
 const Mixer: React.FC = () => {
   const { user } = useAuth();
@@ -23,6 +24,9 @@ const Mixer: React.FC = () => {
   const [track2Url, setTrack2Url] = useState<string | undefined>();
   const [track2Name, setTrack2Name] = useState<string | undefined>();
   const [mixedTrackUrl, setMixedTrackUrl] = useState<string | undefined>();
+  
+  // Storage states
+  const [storageReady, setStorageReady] = useState<boolean | null>(null);
   
   // Analysis states (would be populated by backend)
   const [track1Analysis, setTrack1Analysis] = useState({
@@ -53,12 +57,45 @@ const Mixer: React.FC = () => {
   const wavesurfer2Ref = useRef<WaveSurfer | null>(null);
   const mixedWavesurferRef = useRef<WaveSurfer | null>(null);
   
+  // Check storage bucket on component mount
+  useEffect(() => {
+    const checkStorage = async () => {
+      try {
+        console.log("Mixer: Checking storage bucket...");
+        const result = await createBucketIfNotExists(STORAGE_BUCKET, true);
+        setStorageReady(result);
+        
+        if (!result) {
+          console.error(`Mixer: Failed to ensure bucket "${STORAGE_BUCKET}" exists`);
+          toast({
+            title: "Storage Setup Issue",
+            description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project with public access.`,
+            variant: "destructive",
+          });
+        } else {
+          console.log(`Mixer: Bucket "${STORAGE_BUCKET}" is ready for use`);
+        }
+      } catch (err) {
+        console.error("Mixer: Error checking storage bucket:", err);
+        setStorageReady(false);
+        toast({
+          title: "Storage Error",
+          description: "Could not initialize storage. Check console for details.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    checkStorage();
+  }, [toast]);
+  
   // Redirect if not logged in
   if (!user) {
     return <Navigate to="/login" replace />;
   }
   
   const handleTrack1Upload = (url: string, fileName: string) => {
+    console.log("Mixer: Track 1 upload complete:", { url, fileName });
     setTrack1Url(url);
     setTrack1Name(fileName);
     setTrack1Analysis(prev => ({ ...prev, isLoading: true }));
@@ -76,6 +113,7 @@ const Mixer: React.FC = () => {
   };
   
   const handleTrack2Upload = (url: string, fileName: string) => {
+    console.log("Mixer: Track 2 upload complete:", { url, fileName });
     setTrack2Url(url);
     setTrack2Name(fileName);
     setTrack2Analysis(prev => ({ ...prev, isLoading: true }));
@@ -113,7 +151,8 @@ const Mixer: React.FC = () => {
       if (progress >= 100) {
         clearInterval(interval);
         setIsMixing(false);
-        setMixedTrackUrl(track1Url); // In real app, this would be the mixed track URL
+        // In a real app, this would be the mixed track URL from the server
+        setMixedTrackUrl(track1Url); 
         
         toast({
           title: "Mix complete",
@@ -171,6 +210,20 @@ const Mixer: React.FC = () => {
           <h1 className="text-3xl font-bold">Mix Studio</h1>
           <p className="text-white/70">Upload two tracks and create a professional AI mix</p>
         </div>
+        
+        {storageReady === false && (
+          <div className="mb-6 p-4 border border-red-500/50 bg-red-500/10 rounded-lg">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
+              <div>
+                <h3 className="text-md text-red-400 font-medium">Storage Not Available</h3>
+                <p className="text-sm text-red-300/80">
+                  The audio storage system is not properly configured. Please ensure bucket "{STORAGE_BUCKET}" exists in your Supabase project with public access enabled.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Track 1 */}
@@ -260,7 +313,7 @@ const Mixer: React.FC = () => {
                     </p>
                     <Button 
                       onClick={handleMix} 
-                      disabled={!track1Url || !track2Url}
+                      disabled={!track1Url || !track2Url || storageReady === false}
                       className="bg-mixify-purple hover:bg-mixify-purple-dark"
                     >
                       <MicIcon className="mr-2 h-5 w-5" />

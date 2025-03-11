@@ -1,11 +1,16 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Music2, X } from 'lucide-react';
+import { Upload, Music2, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { supabase, STORAGE_BUCKET, createBucketIfNotExists } from '@/lib/supabase';
+import { 
+  supabase, 
+  STORAGE_BUCKET, 
+  createBucketIfNotExists,
+  uploadFileToBucket 
+} from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AudioUploaderProps {
@@ -18,29 +23,41 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [bucketReady, setBucketReady] = useState(false);
+  const [bucketCheckInProgress, setBucketCheckInProgress] = useState(true);
   const { toast } = useToast();
 
   // Check if our storage bucket exists when component mounts
   useEffect(() => {
     const checkBucket = async () => {
-      console.log(`Initializing AudioUploader for track ${trackNumber}...`);
+      console.log(`AudioUploader ${trackNumber}: Initializing and checking for bucket "${STORAGE_BUCKET}"...`);
       try {
+        setBucketCheckInProgress(true);
+        
+        // Attempt to create the bucket if it doesn't exist
         const created = await createBucketIfNotExists(STORAGE_BUCKET, true);
+        
         setBucketReady(created);
         
         if (!created) {
-          console.error(`Failed to ensure bucket "${STORAGE_BUCKET}" exists`);
+          console.error(`AudioUploader ${trackNumber}: Failed to ensure bucket "${STORAGE_BUCKET}" exists`);
           toast({
             title: "Storage Setup Issue",
-            description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project.`,
+            description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project with public access.`,
             variant: "destructive",
           });
         } else {
-          console.log(`Bucket "${STORAGE_BUCKET}" is ready for use`);
+          console.log(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" is ready for use`);
         }
       } catch (err) {
-        console.error('Error setting up storage bucket:', err);
+        console.error(`AudioUploader ${trackNumber}: Error setting up storage bucket:`, err);
         setBucketReady(false);
+        toast({
+          title: "Storage Setup Error",
+          description: `Could not connect to storage bucket "${STORAGE_BUCKET}". Please check console for details.`,
+          variant: "destructive",
+        });
+      } finally {
+        setBucketCheckInProgress(false);
       }
     };
     
@@ -50,8 +67,14 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
     
+    if (!selectedFile) {
+      console.log(`AudioUploader ${trackNumber}: No file selected`);
+      return;
+    }
+    
     // Validate file type
     if (!selectedFile.type.startsWith('audio/')) {
+      console.warn(`AudioUploader ${trackNumber}: Invalid file type:`, selectedFile.type);
       toast({
         title: "Invalid file type",
         description: "Please upload an audio file (MP3, WAV, etc).",
@@ -62,6 +85,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
     
     // Validate file size (20MB max)
     if (selectedFile.size > 20 * 1024 * 1024) {
+      console.warn(`AudioUploader ${trackNumber}: File too large:`, (selectedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
       toast({
         title: "File too large",
         description: "Please upload an audio file smaller than 20MB.",
@@ -70,7 +94,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       return;
     }
     
-    console.log(`File selected for track ${trackNumber}:`, {
+    console.log(`AudioUploader ${trackNumber}: File selected:`, {
       name: selectedFile.name,
       type: selectedFile.type,
       size: `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`
@@ -88,11 +112,16 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
   });
 
   const uploadFile = async () => {
-    if (!file) return;
+    if (!file) {
+      console.warn(`AudioUploader ${trackNumber}: Cannot upload - no file selected`);
+      return;
+    }
+    
     if (!bucketReady) {
+      console.error(`AudioUploader ${trackNumber}: Cannot upload - bucket "${STORAGE_BUCKET}" not ready`);
       toast({
         title: "Storage not ready",
-        description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project.`,
+        description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project with public access.`,
         variant: "destructive",
       });
       return;
@@ -100,71 +129,56 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
 
     try {
       setUploading(true);
-      setProgress(10); // Show some initial progress to the user
+      setProgress(5); // Show some initial progress to the user
       
       // Create unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `track-${trackNumber}/${fileName}`;
       
-      console.log(`Starting upload for track ${trackNumber}:`, { 
+      console.log(`AudioUploader ${trackNumber}: Starting upload...`, { 
         bucketName: STORAGE_BUCKET,
         filePath,
-        fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-        fileType: file.type 
+        fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB` 
       });
       
-      // Track upload progress through intervals
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          // Simulate upload progress until we reach 90%
-          if (prev < 90) {
-            return prev + 10;
-          }
-          return prev;
-        });
-      }, 500);
+      // Use the improved upload function
+      const result = await uploadFileToBucket(
+        file, 
+        filePath, 
+        (progress) => setProgress(progress)
+      );
       
-      // Upload to Supabase storage bucket
-      const { data, error } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true // Set to true to replace existing files
-        });
-      
-      // Clear the progress interval
-      clearInterval(progressInterval);
-      
-      if (error) {
-        console.error(`Supabase upload error for track ${trackNumber}:`, error);
-        throw error;
-      }
-      
-      console.log(`Upload successful for track ${trackNumber}:`, data);
-      setProgress(95);
-      
-      // Get public URL
-      const { data: urlData } = supabase
-        .storage
-        .from(STORAGE_BUCKET)
-        .getPublicUrl(filePath);
-      
-      console.log(`Public URL obtained for track ${trackNumber}:`, urlData);
-      setProgress(100);
+      console.log(`AudioUploader ${trackNumber}: Upload completed`, result);
       
       // Notify parent component
-      onUploadComplete(urlData.publicUrl, file.name);
+      onUploadComplete(result.publicUrl, file.name);
       
       toast({
         title: "Upload complete",
         description: `Track ${trackNumber} uploaded successfully.`,
       });
     } catch (error: any) {
-      console.error(`Error uploading file for track ${trackNumber}:`, error);
+      console.error(`AudioUploader ${trackNumber}: Error uploading file:`, error);
+      
+      // Show more specific error messages
+      let errorMessage = "An error occurred during upload.";
+      
+      if (error.message) {
+        if (error.message.includes('permission') || error.message.includes('authorized')) {
+          errorMessage = "Permission denied. Check Supabase storage settings.";
+        } else if (error.message.includes('not found') || error.message.includes('404')) {
+          errorMessage = `Bucket "${STORAGE_BUCKET}" not found. Check Supabase storage.`;
+        } else if (error.message.includes('network') || error.message.includes('connection')) {
+          errorMessage = "Network error. Check your internet connection.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Upload failed",
-        description: error.message || "An error occurred during upload.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -181,6 +195,21 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
 
   return (
     <div className="space-y-4">
+      {bucketCheckInProgress && (
+        <div className="flex items-center justify-center p-4 bg-black/20 rounded-lg">
+          <Loader2 className="h-5 w-5 text-mixify-purple animate-spin mr-2" />
+          <p className="text-sm text-white/70">Checking storage configuration...</p>
+        </div>
+      )}
+      
+      {!bucketCheckInProgress && !bucketReady && (
+        <div className="p-4 border border-red-500/50 bg-red-500/10 rounded-lg">
+          <p className="text-sm text-red-400">
+            Storage bucket "{STORAGE_BUCKET}" is not available. Please create it in your Supabase project with public access.
+          </p>
+        </div>
+      )}
+      
       {!file ? (
         <div 
           {...getRootProps()} 
@@ -228,7 +257,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
             <div className="space-y-2">
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-center text-white/70">
-                Uploading... {progress}%
+                Uploading... {Math.round(progress)}%
               </p>
             </div>
           ) : (
