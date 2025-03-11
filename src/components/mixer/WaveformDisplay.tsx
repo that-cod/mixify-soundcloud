@@ -32,7 +32,6 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
       barRadius: 2,
       height: height,
       normalize: true,
-      backgroundColor: 'rgba(0, 0, 0, 0.2)',
     });
 
     wavesurferRef.current = wavesurfer;

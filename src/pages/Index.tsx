@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Music3, WaveformIcon, Upload, Download, Headphones } from 'lucide-react';
+import { Music3, Waveform, Upload, Download, Headphones } from 'lucide-react';
 
 const Index: React.FC = () => {
   const { user } = useAuth();
@@ -73,7 +73,7 @@ const Index: React.FC = () => {
             
             <div className="glass-card p-6 rounded-lg flex flex-col items-center text-center">
               <div className="h-12 w-12 flex items-center justify-center rounded-full bg-mixify-purple/20 mb-4">
-                <WaveformIcon className="h-6 w-6 text-mixify-purple-light" />
+                <Waveform className="h-6 w-6 text-mixify-purple-light" />
               </div>
               <h3 className="text-xl font-semibold mb-3">AI Analysis</h3>
               <p className="text-white/70">
@@ -99,7 +99,7 @@ const Index: React.FC = () => {
         <div className="container px-4 mx-auto">
           <div className="glass-card p-8 md:p-12 rounded-xl bg-gradient-to-r from-mixify-purple/20 to-mixify-dark">
             <div className="flex flex-col items-center text-center max-w-2xl mx-auto">
-              <WaveformIcon className="h-12 w-12 text-mixify-purple-light mb-6" />
+              <Waveform className="h-12 w-12 text-mixify-purple-light mb-6" />
               
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
                 Ready to Create Your First Mix?

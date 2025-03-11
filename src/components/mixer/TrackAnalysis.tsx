@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { WaveformIcon, Music3, Clock } from 'lucide-react';
+import { Waveform, Music3, Clock } from 'lucide-react';
 
 interface TrackAnalysisProps {
   trackName: string;
@@ -39,7 +39,7 @@ export const TrackAnalysis: React.FC<TrackAnalysisProps> = ({
         </CardHeader>
         <CardContent className="flex items-center justify-center py-6">
           <div className="flex flex-col items-center justify-center gap-3">
-            <WaveformIcon className="h-10 w-10 text-mixify-purple-light animate-pulse-opacity" />
+            <Waveform className="h-10 w-10 text-mixify-purple-light animate-pulse-opacity" />
             <p className="text-sm text-white/70">Extracting audio features</p>
           </div>
         </CardContent>
