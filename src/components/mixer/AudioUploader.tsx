@@ -58,39 +58,49 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
 
     try {
       setUploading(true);
+      setProgress(10); // Show some initial progress to the user
       
       // Create unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `tracks/${fileName}`;
+      const filePath = `uploads/${fileName}`;
       
-      // Track upload progress
-      let lastProgress = 0;
-      const progressHandler = (progress: { loaded: number; total: number }) => {
-        const percent = Math.round((progress.loaded / progress.total) * 100);
-        if (percent > lastProgress) {
-          setProgress(percent);
-          lastProgress = percent;
-        }
-      };
+      // Track upload progress through intervals
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          // Simulate upload progress until we reach 90%
+          if (prev < 90) {
+            return prev + 10;
+          }
+          return prev;
+        });
+      }, 500);
       
-      // Upload to Supabase
+      // Upload to Supabase - using public bucket
+      // Note: The bucket should be named 'public' which is created by default in Supabase
       const { data, error } = await supabase.storage
-        .from('audio')
+        .from('public')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         });
       
+      // Clear the progress interval
+      clearInterval(progressInterval);
+      
       if (error) {
         throw error;
       }
       
+      setProgress(95);
+      
       // Get public URL
       const { data: urlData } = supabase
         .storage
-        .from('audio')
+        .from('public')
         .getPublicUrl(filePath);
+      
+      setProgress(100);
       
       // Notify parent component
       onUploadComplete(urlData.publicUrl, file.name);
@@ -108,7 +118,9 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       });
     } finally {
       setUploading(false);
-      setProgress(0);
+      setTimeout(() => {
+        setProgress(0);
+      }, 1000);
     }
   };
 
