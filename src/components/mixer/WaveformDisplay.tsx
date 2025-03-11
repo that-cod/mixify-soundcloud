@@ -30,7 +30,6 @@ export const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
       barWidth: 2,
       barGap: 1,
       barRadius: 2,
-      responsive: true,
       height: height,
       normalize: true,
       backgroundColor: 'rgba(0, 0, 0, 0.2)',

@@ -2,7 +2,7 @@
 import React from 'react';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { Waveform, Music3, Lightbulb, Sparkles } from 'lucide-react';
+import { WaveformIcon, Music3, Lightbulb, Sparkles } from 'lucide-react';
 
 const About: React.FC = () => {
   return (
@@ -56,7 +56,7 @@ const About: React.FC = () => {
             <Card className="glass-card overflow-hidden">
               <div className="p-6">
                 <div className="w-12 h-12 rounded-full bg-mixify-purple/20 flex items-center justify-center mb-4">
-                  <Waveform className="h-6 w-6 text-mixify-purple-light" />
+                  <WaveformIcon className="h-6 w-6 text-mixify-purple-light" />
                 </div>
                 <h3 className="text-xl font-semibold mb-3">Beat Matching</h3>
                 <p className="text-white/70">

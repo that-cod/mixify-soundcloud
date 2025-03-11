@@ -9,7 +9,7 @@ import { PlaybackControls } from '@/components/mixer/PlaybackControls';
 import { TrackAnalysis } from '@/components/mixer/TrackAnalysis';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MixIcon, Loader2 } from 'lucide-react';
+import { MicIcon, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import WaveSurfer from 'wavesurfer.js';
 
@@ -263,7 +263,7 @@ const Mixer: React.FC = () => {
                       disabled={!track1Url || !track2Url}
                       className="bg-mixify-purple hover:bg-mixify-purple-dark"
                     >
-                      <MixIcon className="mr-2 h-5 w-5" />
+                      <MicIcon className="mr-2 h-5 w-5" />
                       Mix Tracks
                     </Button>
                   </div>

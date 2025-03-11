@@ -64,16 +64,22 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `tracks/${fileName}`;
       
+      // Track upload progress
+      let lastProgress = 0;
+      const progressHandler = (progress: { loaded: number; total: number }) => {
+        const percent = Math.round((progress.loaded / progress.total) * 100);
+        if (percent > lastProgress) {
+          setProgress(percent);
+          lastProgress = percent;
+        }
+      };
+      
       // Upload to Supabase
       const { data, error } = await supabase.storage
         .from('audio')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false,
-          onUploadProgress: (progress) => {
-            const percent = Math.round((progress.loaded / progress.total) * 100);
-            setProgress(percent);
-          },
+          upsert: false
         });
       
       if (error) {
