@@ -63,7 +63,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       // Create unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `uploads/${fileName}`;
+      const filePath = `audio/${fileName}`;
       
       // Track upload progress through intervals
       const progressInterval = setInterval(() => {
@@ -76,22 +76,30 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
         });
       }, 500);
       
-      // Upload to Supabase - using public bucket
-      // Note: The bucket should be named 'public' which is created by default in Supabase
+      console.log('Starting upload to Supabase', { 
+        bucketName: 'public',
+        filePath,
+        fileSize: file.size,
+        fileType: file.type 
+      });
+      
+      // Upload to Supabase storage bucket
       const { data, error } = await supabase.storage
         .from('public')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true // Set to true to replace existing files
         });
       
       // Clear the progress interval
       clearInterval(progressInterval);
       
       if (error) {
+        console.error('Supabase upload error:', error);
         throw error;
       }
       
+      console.log('Upload successful, getting public URL');
       setProgress(95);
       
       // Get public URL
@@ -100,6 +108,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
         .from('public')
         .getPublicUrl(filePath);
       
+      console.log('Public URL obtained:', urlData);
       setProgress(100);
       
       // Notify parent component
