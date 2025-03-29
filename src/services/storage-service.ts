@@ -2,8 +2,8 @@
 import { supabase } from '@/lib/supabase-client';
 import { v4 as uuidv4 } from 'uuid';
 
-// Define the storage bucket name as a constant - case sensitive to match what you've created
-export const AUDIO_BUCKET = 'Mixify-audio';
+// Define the storage bucket name as a constant - case sensitive to match what you've created in Supabase
+export const AUDIO_BUCKET = 'mixify-audio';
 
 // Interface for bucket status checks
 export interface BucketStatus {
