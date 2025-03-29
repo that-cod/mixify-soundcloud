@@ -1,11 +1,10 @@
-
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { processAudio, analyzeAudio } = require('./audio');
-const { mixTracks } = require('./mixingEngine');
+const { mixTracks } = require('./mixing');
 const { analyzePrompt } = require('./promptAnalyzer');
 const config = require('./config');
 const { runSetup } = require('./setup');
