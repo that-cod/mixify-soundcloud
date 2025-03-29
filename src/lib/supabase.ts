@@ -13,7 +13,102 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Utility function to check if a bucket exists
+// Improved bucket verification function
+export const verifyBucketAccess = async (bucketName: string): Promise<{
+  exists: boolean;
+  canUpload: boolean;
+  isPublic: boolean;
+  errorMessage?: string;
+}> => {
+  try {
+    console.log(`Verifying bucket "${bucketName}" access...`);
+    
+    // Step 1: Check if bucket exists
+    const { data: bucketData, error: bucketError } = await supabase
+      .storage
+      .getBucket(bucketName);
+    
+    if (bucketError) {
+      console.error('Error checking bucket:', bucketError);
+      
+      if (bucketError.message.includes('does not exist')) {
+        return {
+          exists: false,
+          canUpload: false,
+          isPublic: false,
+          errorMessage: `Bucket "${bucketName}" does not exist in your Supabase project. Please create it manually in the Supabase dashboard.`
+        };
+      }
+      
+      if (bucketError.message.includes('permission') || bucketError.message.includes('not authorized')) {
+        return {
+          exists: true, // We assume it exists but can't access it
+          canUpload: false, 
+          isPublic: false,
+          errorMessage: 'You do not have permission to access this bucket. Please check your RLS policies.'
+        };
+      }
+      
+      return {
+        exists: false,
+        canUpload: false,
+        isPublic: false,
+        errorMessage: bucketError.message
+      };
+    }
+    
+    console.log(`Bucket verification result:`, bucketData);
+    
+    // Step 2: Verify upload permissions by trying to create a test file
+    const testFileName = `permission-test-${Date.now()}.txt`;
+    const { error: uploadError } = await supabase
+      .storage
+      .from(bucketName)
+      .upload(testFileName, new Blob(['test']), {
+        upsert: true
+      });
+      
+    // Clean up test file if successfully created
+    if (!uploadError) {
+      await supabase
+        .storage
+        .from(bucketName)
+        .remove([testFileName]);
+    }
+    
+    // Step 3: Verify if bucket is public by checking the policy
+    let isPublic = bucketData?.public || false;
+    
+    // Additional check: the bucket might be public but configured incorrectly
+    if (isPublic) {
+      const { data: publicUrl } = supabase
+        .storage
+        .from(bucketName)
+        .getPublicUrl(testFileName);
+        
+      isPublic = !!publicUrl.publicUrl;
+    }
+    
+    return {
+      exists: true,
+      canUpload: !uploadError,
+      isPublic,
+      errorMessage: uploadError ? 
+        'You do not have permission to upload to this bucket. Please check your RLS policies.' : 
+        undefined
+    };
+  } catch (err: any) {
+    console.error('Exception during bucket verification:', err);
+    return {
+      exists: false,
+      canUpload: false,
+      isPublic: false,
+      errorMessage: err.message || 'Unknown error verifying bucket access'
+    };
+  }
+};
+
+// Check if a bucket exists (simplified version)
 export const checkBucketExists = async (bucketName: string) => {
   try {
     console.log(`Checking if bucket "${bucketName}" exists...`);
@@ -34,55 +129,28 @@ export const checkBucketExists = async (bucketName: string) => {
   }
 };
 
-// Improved utility to create a bucket with better error handling
+// No need to create bucket since it's manually created in Supabase dashboard
 export const createBucketIfNotExists = async (bucketName: string, isPublic = true) => {
   try {
-    console.log(`Attempting to ensure bucket "${bucketName}" exists...`);
+    console.log(`Ensuring bucket "${bucketName}" exists and is accessible...`);
     
-    // First check if the bucket exists
-    const exists = await checkBucketExists(bucketName);
+    // First verify bucket access
+    const bucketStatus = await verifyBucketAccess(bucketName);
     
-    if (!exists) {
-      console.log(`Bucket "${bucketName}" doesn't exist, creating it now...`);
-      
-      const { data, error } = await supabase
-        .storage
-        .createBucket(bucketName, {
-          public: isPublic,
-          fileSizeLimit: 50 * 1024 * 1024 // 50MB limit for audio files
-        });
-        
-      if (error) {
-        console.error('Error creating bucket:', error);
-        
-        // Check if this is a permissions error
-        if (error.message.includes('permission') || error.message.includes('not authorized')) {
-          console.error('Permission denied. The current user may not have bucket creation rights.');
-          return false;
-        }
-        
-        return false;
-      }
-      
-      console.log(`Bucket "${bucketName}" created successfully:`, data);
-      
-      // Set public bucket policy to ensure files are publicly accessible
-      const { error: policyError } = await supabase
-        .storage
-        .from(bucketName)
-        .createSignedUrl('test-policy.txt', 60);
-      
-      if (policyError && !policyError.message.includes('not found')) {
-        console.error('Error setting bucket policy:', policyError);
-      }
-      
-      return true;
+    if (!bucketStatus.exists) {
+      console.error(`Bucket "${bucketName}" doesn't exist. Please create it manually in the Supabase dashboard.`);
+      return false;
     }
     
-    console.log(`Bucket "${bucketName}" already exists.`);
+    if (!bucketStatus.canUpload) {
+      console.error(`Cannot upload to bucket "${bucketName}": ${bucketStatus.errorMessage}`);
+      return false;
+    }
+    
+    console.log(`Bucket "${bucketName}" is accessible with upload permissions.`);
     return true;
   } catch (err) {
-    console.error('Exception during bucket creation process:', err);
+    console.error('Exception during bucket verification:', err);
     return false;
   }
 };
@@ -100,11 +168,11 @@ export const uploadFileToBucket = async (
       fileType: file.type
     });
     
-    // Ensure bucket exists before uploading
-    const bucketExists = await createBucketIfNotExists(STORAGE_BUCKET, true);
+    // Verify bucket access before uploading
+    const bucketStatus = await verifyBucketAccess(STORAGE_BUCKET);
     
-    if (!bucketExists) {
-      throw new Error(`Cannot upload: bucket "${STORAGE_BUCKET}" doesn't exist and couldn't be created`);
+    if (!bucketStatus.exists || !bucketStatus.canUpload) {
+      throw new Error(bucketStatus.errorMessage || `Cannot upload: bucket "${STORAGE_BUCKET}" is not accessible`);
     }
     
     // Track upload progress manually if a callback is provided

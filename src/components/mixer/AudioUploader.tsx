@@ -1,6 +1,7 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Music2, X, Loader2 } from 'lucide-react';
+import { Upload, Music2, X, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
@@ -8,7 +9,8 @@ import {
   supabase, 
   STORAGE_BUCKET, 
   createBucketIfNotExists,
-  uploadFileToBucket 
+  uploadFileToBucket,
+  verifyBucketAccess
 } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,38 +23,61 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [bucketReady, setBucketReady] = useState(false);
+  const [bucketStatus, setBucketStatus] = useState<{
+    exists: boolean;
+    canUpload: boolean;
+    isPublic: boolean;
+    errorMessage?: string;
+  } | null>(null);
   const [bucketCheckInProgress, setBucketCheckInProgress] = useState(true);
   const { toast } = useToast();
 
   // Check if our storage bucket exists when component mounts
   useEffect(() => {
     const checkBucket = async () => {
-      console.log(`AudioUploader ${trackNumber}: Initializing and checking for bucket "${STORAGE_BUCKET}"...`);
+      console.log(`AudioUploader ${trackNumber}: Verifying bucket "${STORAGE_BUCKET}" status...`);
       try {
         setBucketCheckInProgress(true);
         
-        // Attempt to create the bucket if it doesn't exist
-        const created = await createBucketIfNotExists(STORAGE_BUCKET, true);
+        // Use the new verify function instead
+        const status = await verifyBucketAccess(STORAGE_BUCKET);
+        setBucketStatus(status);
         
-        setBucketReady(created);
-        
-        if (!created) {
-          console.error(`AudioUploader ${trackNumber}: Failed to ensure bucket "${STORAGE_BUCKET}" exists`);
+        if (!status.exists) {
+          console.error(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" doesn't exist`);
           toast({
-            title: "Storage Setup Issue",
-            description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project with public access.`,
+            title: "Storage Missing",
+            description: status.errorMessage || `Bucket "${STORAGE_BUCKET}" doesn't exist in your Supabase project.`,
             variant: "destructive",
+          });
+        } else if (!status.canUpload) {
+          console.error(`AudioUploader ${trackNumber}: Cannot upload to bucket "${STORAGE_BUCKET}"`);
+          toast({
+            title: "Upload Permission Issue",
+            description: status.errorMessage || "You don't have permission to upload to this bucket.",
+            variant: "destructive",
+          });
+        } else if (!status.isPublic) {
+          console.warn(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" is not public`);
+          toast({
+            title: "Storage Warning",
+            description: "The storage bucket is not set to public. Your uploaded files might not be accessible.",
+            variant: "warning",
           });
         } else {
           console.log(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" is ready for use`);
         }
       } catch (err) {
-        console.error(`AudioUploader ${trackNumber}: Error setting up storage bucket:`, err);
-        setBucketReady(false);
+        console.error(`AudioUploader ${trackNumber}: Error verifying bucket:`, err);
+        setBucketStatus({
+          exists: false,
+          canUpload: false,
+          isPublic: false,
+          errorMessage: err instanceof Error ? err.message : 'Unknown error verifying bucket'
+        });
         toast({
-          title: "Storage Setup Error",
-          description: `Could not connect to storage bucket "${STORAGE_BUCKET}". Please check console for details.`,
+          title: "Storage Verification Error",
+          description: "Could not verify storage bucket status. Please check console for details.",
           variant: "destructive",
         });
       } finally {
@@ -116,11 +141,11 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       return;
     }
     
-    if (!bucketReady) {
-      console.error(`AudioUploader ${trackNumber}: Cannot upload - bucket "${STORAGE_BUCKET}" not ready`);
+    if (!bucketStatus?.canUpload) {
+      console.error(`AudioUploader ${trackNumber}: Cannot upload - ${bucketStatus?.errorMessage || 'bucket not accessible'}`);
       toast({
-        title: "Storage not ready",
-        description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project with public access.`,
+        title: "Storage not accessible",
+        description: bucketStatus?.errorMessage || `Cannot upload to bucket "${STORAGE_BUCKET}".`,
         variant: "destructive",
       });
       return;
@@ -211,15 +236,33 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       {bucketCheckInProgress && (
         <div className="flex items-center justify-center p-4 bg-black/20 rounded-lg">
           <Loader2 className="h-5 w-5 text-mixify-purple animate-spin mr-2" />
-          <p className="text-sm text-white/70">Checking storage configuration...</p>
+          <p className="text-sm text-white/70">Verifying storage access...</p>
         </div>
       )}
       
-      {!bucketCheckInProgress && !bucketReady && (
+      {!bucketCheckInProgress && bucketStatus && !bucketStatus.exists && (
         <div className="p-4 border border-red-500/50 bg-red-500/10 rounded-lg">
-          <p className="text-sm text-red-400">
-            Storage bucket "{STORAGE_BUCKET}" is not available. Please create it in your Supabase project with public access.
-          </p>
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
+            <div>
+              <p className="text-sm text-red-400">
+                {bucketStatus.errorMessage || `Storage bucket "${STORAGE_BUCKET}" does not exist. Please create it in your Supabase project.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {!bucketCheckInProgress && bucketStatus && bucketStatus.exists && !bucketStatus.canUpload && (
+        <div className="p-4 border border-yellow-500/50 bg-yellow-500/10 rounded-lg">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
+            <div>
+              <p className="text-sm text-yellow-400">
+                {bucketStatus.errorMessage || `You don't have permission to upload to bucket "${STORAGE_BUCKET}". Check your Supabase RLS policies.`}
+              </p>
+            </div>
+          </div>
         </div>
       )}
       
@@ -278,7 +321,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
               onClick={uploadFile} 
               className="w-full bg-mixify-purple hover:bg-mixify-purple-dark"
               size="sm"
-              disabled={!bucketReady}
+              disabled={!bucketStatus?.canUpload}
             >
               Upload Track {trackNumber}
             </Button>

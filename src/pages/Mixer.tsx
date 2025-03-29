@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MicIcon, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import WaveSurfer from 'wavesurfer.js';
-import { createBucketIfNotExists, STORAGE_BUCKET } from '@/lib/supabase';
+import { STORAGE_BUCKET, verifyBucketAccess } from '@/lib/supabase';
 
 const Mixer: React.FC = () => {
   const { user } = useAuth();
@@ -26,7 +26,13 @@ const Mixer: React.FC = () => {
   const [mixedTrackUrl, setMixedTrackUrl] = useState<string | undefined>();
   
   // Storage states
-  const [storageReady, setStorageReady] = useState<boolean | null>(null);
+  const [bucketStatus, setBucketStatus] = useState<{
+    exists: boolean;
+    canUpload: boolean;
+    isPublic: boolean;
+    errorMessage?: string;
+  } | null>(null);
+  const [storageBucketChecking, setStorageBucketChecking] = useState(true);
   
   // Analysis states (would be populated by backend)
   const [track1Analysis, setTrack1Analysis] = useState({
@@ -61,28 +67,43 @@ const Mixer: React.FC = () => {
   useEffect(() => {
     const checkStorage = async () => {
       try {
-        console.log("Mixer: Checking storage bucket...");
-        const result = await createBucketIfNotExists(STORAGE_BUCKET, true);
-        setStorageReady(result);
+        console.log("Mixer: Verifying storage bucket status...");
+        setStorageBucketChecking(true);
+        const status = await verifyBucketAccess(STORAGE_BUCKET);
+        setBucketStatus(status);
         
-        if (!result) {
-          console.error(`Mixer: Failed to ensure bucket "${STORAGE_BUCKET}" exists`);
+        if (!status.exists) {
+          console.error(`Mixer: Bucket "${STORAGE_BUCKET}" doesn't exist`);
           toast({
-            title: "Storage Setup Issue",
-            description: `Please make sure you've created a bucket named "${STORAGE_BUCKET}" in your Supabase project with public access.`,
+            title: "Storage Not Available",
+            description: status.errorMessage || `Bucket "${STORAGE_BUCKET}" doesn't exist in your Supabase project.`,
+            variant: "destructive",
+          });
+        } else if (!status.canUpload) {
+          console.error(`Mixer: Cannot upload to bucket "${STORAGE_BUCKET}"`);
+          toast({
+            title: "Upload Permission Issue",
+            description: status.errorMessage || "You don't have permission to upload to this bucket.",
             variant: "destructive",
           });
         } else {
           console.log(`Mixer: Bucket "${STORAGE_BUCKET}" is ready for use`);
         }
       } catch (err) {
-        console.error("Mixer: Error checking storage bucket:", err);
-        setStorageReady(false);
+        console.error("Mixer: Error verifying storage bucket:", err);
+        setBucketStatus({
+          exists: false,
+          canUpload: false,
+          isPublic: false,
+          errorMessage: err instanceof Error ? err.message : 'Unknown error checking storage bucket'
+        });
         toast({
           title: "Storage Error",
-          description: "Could not initialize storage. Check console for details.",
+          description: "Could not verify storage bucket status. Check console for details.",
           variant: "destructive",
         });
+      } finally {
+        setStorageBucketChecking(false);
       }
     };
     
@@ -211,14 +232,37 @@ const Mixer: React.FC = () => {
           <p className="text-white/70">Upload two tracks and create a professional AI mix</p>
         </div>
         
-        {storageReady === false && (
+        {storageBucketChecking && (
+          <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-lg">
+            <div className="flex items-center">
+              <Loader2 className="h-5 w-5 text-mixify-purple animate-spin mr-2" />
+              <p className="text-sm text-white/70">Verifying storage access...</p>
+            </div>
+          </div>
+        )}
+        
+        {!storageBucketChecking && bucketStatus && !bucketStatus.exists && (
           <div className="mb-6 p-4 border border-red-500/50 bg-red-500/10 rounded-lg">
             <div className="flex items-start">
               <AlertCircle className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
               <div>
                 <h3 className="text-md text-red-400 font-medium">Storage Not Available</h3>
                 <p className="text-sm text-red-300/80">
-                  The audio storage system is not properly configured. Please ensure bucket "{STORAGE_BUCKET}" exists in your Supabase project with public access enabled.
+                  {bucketStatus.errorMessage || `The storage bucket "${STORAGE_BUCKET}" does not exist. Please create it in your Supabase project with public access enabled.`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {!storageBucketChecking && bucketStatus && bucketStatus.exists && !bucketStatus.canUpload && (
+          <div className="mb-6 p-4 border border-yellow-500/50 bg-yellow-500/10 rounded-lg">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
+              <div>
+                <h3 className="text-md text-yellow-400 font-medium">Upload Permission Issue</h3>
+                <p className="text-sm text-yellow-300/80">
+                  {bucketStatus.errorMessage || `You don't have permission to upload to "${STORAGE_BUCKET}". Check your Supabase RLS policies.`}
                 </p>
               </div>
             </div>
@@ -313,7 +357,7 @@ const Mixer: React.FC = () => {
                     </p>
                     <Button 
                       onClick={handleMix} 
-                      disabled={!track1Url || !track2Url || storageReady === false}
+                      disabled={!track1Url || !track2Url || !bucketStatus?.canUpload}
                       className="bg-mixify-purple hover:bg-mixify-purple-dark"
                     >
                       <MicIcon className="mr-2 h-5 w-5" />
