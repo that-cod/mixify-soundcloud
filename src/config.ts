@@ -8,6 +8,14 @@
 // API base URL - default to localhost for development
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
+// System resource detection - automatically enable light mode for mobile devices or when explicitly set
+// This helps with performance on limited hardware
+const isLowPowerDevice = 
+  (typeof navigator !== 'undefined' && 
+   (navigator.userAgent.includes('Mobile') || 
+    navigator.userAgent.includes('Android'))) ||
+  import.meta.env.VITE_USE_LIGHT_MODE === 'true';
+
 // Other configuration parameters
 export const CONFIG = {
   // API endpoints
@@ -25,14 +33,18 @@ export const CONFIG = {
   
   // Feature flags
   features: {
-    useFallbackAnalysis: import.meta.env.VITE_USE_FALLBACK_ANALYSIS === 'true',
-    useAudioWorklet: import.meta.env.VITE_USE_AUDIO_WORKLET === 'true',
+    useFallbackAnalysis: import.meta.env.VITE_USE_FALLBACK_ANALYSIS === 'true' || isLowPowerDevice,
+    useAudioWorklet: import.meta.env.VITE_USE_AUDIO_WORKLET === 'true' && !isLowPowerDevice,
+    isLowPowerDevice: isLowPowerDevice
   },
   
   // Audio processing settings
   audio: {
     maxUploadSizeMB: parseInt(import.meta.env.VITE_MAX_UPLOAD_SIZE_MB || '20', 10),
     supportedFormats: ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/ogg'],
+    processingModes: {
+      light: isLowPowerDevice,  // Use simplified processing on low-power devices
+    }
   },
   
   // Frontend settings

@@ -18,3 +18,9 @@ soundfile==0.12.1
 # Utilities
 tqdm==4.65.0
 typing-extensions==4.5.0
+
+# Add retry capability for more robust operation
+tenacity==8.2.2
+
+# Add memory optimization
+psutil==5.9.5

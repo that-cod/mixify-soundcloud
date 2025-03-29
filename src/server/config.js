@@ -2,6 +2,7 @@
 const path = require('path');
 const dotenv = require('dotenv');
 const fs = require('fs');
+const os = require('os');
 
 // Load environment variables
 dotenv.config();
@@ -33,11 +34,23 @@ PYTHON_PATH="python3"
   fs.writeFileSync(envPath, defaultEnv);
 }
 
+// System resource configuration
+const totalMemoryGB = Math.round(os.totalmem() / (1024 * 1024 * 1024) * 10) / 10;
+const cpuCount = os.cpus().length;
+const isLowResourceSystem = totalMemoryGB < 4 || cpuCount < 2;
+
 // Configuration object
 const config = {
   server: {
     port: process.env.PORT || 5000,
     env: process.env.NODE_ENV || 'development',
+    isLowResourceSystem,
+    systemInfo: {
+      memory: totalMemoryGB,
+      cpus: cpuCount,
+      platform: os.platform(),
+      arch: os.arch()
+    }
   },
   
   apiKeys: {
@@ -54,6 +67,10 @@ const config = {
   python: {
     path: process.env.PYTHON_PATH || 'python3',
     scriptDir: path.join(__dirname, 'python'),
+    fallbacks: {
+      useFallbackAnalysis: process.env.USE_FALLBACK_ANALYSIS === 'true' || isLowResourceSystem,
+      useLightStemSeparation: process.env.USE_LIGHT_STEM_SEPARATION === 'true' || isLowResourceSystem
+    }
   },
   
   frontend: {
