@@ -1,10 +1,9 @@
-
-const path = require('path');
 const { PythonShell } = require('python-shell');
 const fs = require('fs');
 const os = require('os');
 const config = require('./config');
 const { spawn } = require('cross-spawn');
+const { pathResolver, getSystemResources, calculateMemoryLimits } = require('./utils/systemUtils');
 
 // Cache for checking if Python scripts exist
 const scriptExistsCache = {};
@@ -118,7 +117,7 @@ print(json.dumps(results))
 `;
 
   // Write the script to a temporary file
-  const tempScriptPath = path.join(os.tmpdir(), 'check_python_deps.py');
+  const tempScriptPath = require('path').join(os.tmpdir(), 'check_python_deps.py');
   fs.writeFileSync(tempScriptPath, checkScript);
   
   try {
@@ -373,35 +372,6 @@ function checkScriptExists(scriptPath) {
 }
 
 /**
- * Get absolute path to Python script directory
- * @returns {string} Absolute path to Python scripts
- */
-function getPythonScriptDir() {
-  // First check the configured script directory
-  const configuredDir = config.python.scriptDir;
-  if (fs.existsSync(configuredDir)) {
-    return configuredDir;
-  }
-  
-  // Fallback to default locations
-  const possiblePaths = [
-    path.join(__dirname, 'python'),
-    path.join(process.cwd(), 'src', 'server', 'python'),
-    path.join(process.cwd(), 'server', 'python')
-  ];
-  
-  for (const dir of possiblePaths) {
-    if (fs.existsSync(dir)) {
-      return dir;
-    }
-  }
-  
-  // Last resort - return the default and log error
-  console.error('Could not find Python script directory, using default');
-  return path.join(__dirname, 'python');
-}
-
-/**
  * Run a Python script with proper error handling
  * @param {string} scriptName Name of the Python script (without path)
  * @param {string[]} args Arguments to pass to the script
@@ -415,38 +385,36 @@ async function runPythonScript(scriptName, args = [], options = {}) {
   }
   
   return new Promise((resolve, reject) => {
-    const scriptDir = getPythonScriptDir();
-    const scriptPath = path.join(scriptDir, scriptName);
+    // Use standardized path resolution
+    const scriptPath = pathResolver.resolvePythonScript(scriptName);
     
     if (!checkScriptExists(scriptPath)) {
-      return reject(new Error(`Python script not found: ${scriptName} (looked in ${scriptDir})`));
+      return reject(new Error(`Python script not found: ${scriptName} (looked in ${pathResolver.getPythonScriptDir()})`));
     }
     
-    // Determine memory constraint for Python
-    const totalMemoryMB = Math.floor(os.totalmem() / (1024 * 1024));
-    const availableMemoryMB = Math.floor(os.freemem() / (1024 * 1024));
+    // Get system resources and memory limits
+    const resources = getSystemResources();
+    const memoryLimits = calculateMemoryLimits();
     
-    // Set memory limit for Python process if system has limited memory
+    // Set memory limit for Python process
     let memoryFlag = [];
-    if (availableMemoryMB < 1024 || totalMemoryMB < 4096) {
-      // Limit Python memory usage on constrained systems
-      // This works on Unix-like systems (won't hurt on Windows)
-      memoryFlag = ['-Xmx1024m'];
+    if (resources.isLowResourceSystem) {
+      memoryFlag = [`-Xmx${memoryLimits.heapLimitMB}m`];
     }
     
     // Set up environment variables for Python
     const env = { ...process.env };
     
     // Pass system resources info to Python
-    env.SYSTEM_MEMORY_MB = String(totalMemoryMB);
-    env.AVAILABLE_MEMORY_MB = String(availableMemoryMB);
-    env.CPU_COUNT = String(os.cpus().length);
+    env.SYSTEM_MEMORY_MB = String(resources.totalMemoryGB * 1024);
+    env.AVAILABLE_MEMORY_MB = String(resources.availableMemoryGB * 1024);
+    env.CPU_COUNT = String(resources.cpuCount);
     
     const defaultOptions = {
       mode: 'text',
       pythonPath: pythonPath,
       pythonOptions: ['-u', ...memoryFlag], // unbuffered output + memory limit
-      scriptPath: scriptDir,
+      scriptPath: pathResolver.getPythonScriptDir(),
       args: args,
       env: env
     };
@@ -454,8 +422,8 @@ async function runPythonScript(scriptName, args = [], options = {}) {
     const mergedOptions = { ...defaultOptions, ...options };
     
     // Add timeout for scripts on limited hardware
-    if (availableMemoryMB < 1024) {
-      mergedOptions.timeout = 180000; // 3 minutes timeout
+    if (resources.isLowResourceSystem) {
+      mergedOptions.timeout = 300000; // 5 minutes timeout for low-resource systems
     }
     
     console.log(`Running Python script: ${scriptName} with args: ${args.join(' ')}`);
@@ -502,37 +470,36 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
   }
   
   return new Promise((resolve, reject) => {
-    const scriptDir = getPythonScriptDir();
-    const scriptPath = path.join(scriptDir, scriptName);
+    // Use standardized path resolution
+    const scriptPath = pathResolver.resolvePythonScript(scriptName);
     
     if (!checkScriptExists(scriptPath)) {
-      return reject(new Error(`Python script not found: ${scriptName} (looked in ${scriptDir})`));
+      return reject(new Error(`Python script not found: ${scriptName} (looked in ${pathResolver.getPythonScriptDir()})`));
     }
     
-    // Determine memory constraint for Python
-    const totalMemoryMB = Math.floor(os.totalmem() / (1024 * 1024));
-    const availableMemoryMB = Math.floor(os.freemem() / (1024 * 1024));
+    // Get system resources and memory limits
+    const resources = getSystemResources();
+    const memoryLimits = calculateMemoryLimits();
     
-    // Set memory limit for Python process if system has limited memory
+    // Set memory limit for Python process
     let memoryFlag = [];
-    if (availableMemoryMB < 1024 || totalMemoryMB < 4096) {
-      // Limit Python memory usage on constrained systems
-      memoryFlag = ['-Xmx1024m'];
+    if (resources.isLowResourceSystem) {
+      memoryFlag = [`-Xmx${memoryLimits.heapLimitMB}m`];
     }
     
     // Set up environment variables for Python
     const env = { ...process.env };
     
     // Pass system resources info to Python
-    env.SYSTEM_MEMORY_MB = String(totalMemoryMB);
-    env.AVAILABLE_MEMORY_MB = String(availableMemoryMB);
-    env.CPU_COUNT = String(os.cpus().length);
+    env.SYSTEM_MEMORY_MB = String(resources.totalMemoryGB * 1024);
+    env.AVAILABLE_MEMORY_MB = String(resources.availableMemoryGB * 1024);
+    env.CPU_COUNT = String(resources.cpuCount);
     
     const defaultOptions = {
       mode: 'text',
       pythonPath: pythonPath,
       pythonOptions: ['-u', ...memoryFlag], // unbuffered output + memory limit 
-      scriptPath: scriptDir,
+      scriptPath: pathResolver.getPythonScriptDir(),
       args: args,
       env: env
     };
@@ -540,8 +507,8 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
     const mergedOptions = { ...defaultOptions, ...options };
     
     // Add timeout for scripts on limited hardware
-    if (availableMemoryMB < 1024) {
-      mergedOptions.timeout = 300000; // 5 minutes timeout
+    if (resources.isLowResourceSystem) {
+      mergedOptions.timeout = 600000; // 10 minutes timeout for long-running tasks
     }
     
     console.log(`Running Python script with progress: ${scriptName} with args: ${args.join(' ')}`);
@@ -606,5 +573,5 @@ module.exports = {
   runPythonScript,
   runPythonScriptWithProgress,
   checkPythonEnvironment,
-  getPythonScriptDir
+  getPythonScriptDir: pathResolver.getPythonScriptDir
 };

@@ -4,7 +4,7 @@
 const path = require('path');
 const { spawn } = require('cross-spawn');
 const { runSetup } = require('./setup');
-const fs = require('fs');
+const { fileManager, getSystemResources, calculateMemoryLimits } = require('./utils/systemUtils');
 
 // Colors for console output
 const colors = {
@@ -17,28 +17,23 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
-// Ensure the uploads directory exists
-function ensureUploadsDirectory() {
-  const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
-  const rootDir = isDev ? path.resolve(__dirname, '..') : process.cwd();
-  const uploadsDir = path.join(rootDir, 'uploads');
-  const tempDir = path.join(uploadsDir, 'temp');
-  
-  [uploadsDir, tempDir].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-      console.log(`${colors.green}Created directory: ${dir}${colors.reset}`);
-    }
-  });
-}
-
 async function main() {
   console.log(`${colors.cyan}=== AI Audio Mixer Backend ===${colors.reset}`);
   console.log(`${colors.cyan}Running setup checks...${colors.reset}`);
   
   try {
     // Ensure uploads directory exists
-    ensureUploadsDirectory();
+    fileManager.ensureDirectoriesExist();
+    
+    // Clean up any old temporary files
+    fileManager.cleanupTempFiles();
+    
+    // Check system resources
+    const resources = getSystemResources();
+    const memoryLimits = calculateMemoryLimits();
+    
+    console.log(`${colors.green}System resources: ${resources.totalMemoryGB}GB RAM, ${resources.cpuCount} CPUs${colors.reset}`);
+    console.log(`${colors.green}Running in ${resources.isLowResourceSystem ? 'low-resource' : 'normal'} mode${colors.reset}`);
     
     // Run setup checks
     await runSetup();
@@ -49,11 +44,20 @@ async function main() {
     
     console.log(`${colors.green}Starting server in ${isDev ? 'development' : 'production'} mode...${colors.reset}`);
     
+    // Set environment variables for optimal memory usage
+    const env = { ...process.env };
+    
+    // Apply memory limits from calculation
+    for (const [key, value] of Object.entries(memoryLimits.environmentVariables)) {
+      env[key] = value;
+    }
+    
     // Start the server
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     const server = spawn(npm, ['run', script], {
       stdio: 'inherit',
-      cwd: path.join(__dirname)
+      cwd: path.join(__dirname),
+      env
     });
     
     server.on('error', (err) => {
@@ -78,6 +82,11 @@ async function main() {
       console.log(`${colors.yellow}Received SIGTERM. Gracefully shutting down...${colors.reset}`);
       server.kill('SIGTERM');
     });
+    
+    // Set up periodic temp file cleanup
+    setInterval(() => {
+      fileManager.cleanupTempFiles();
+    }, 6 * 3600 * 1000); // Clean every 6 hours
     
   } catch (error) {
     console.error(`${colors.red}Setup failed:${colors.reset}`, error);

@@ -9,6 +9,7 @@ const fs = require('fs');
 const { runPythonScript, checkPythonEnvironment } = require('../pythonBridge');
 const config = require('../config');
 const { nanoid } = require('nanoid');
+const { pathResolver, getSystemResources } = require('../utils/systemUtils');
 
 /**
  * Initialize the analyzer module
@@ -19,9 +20,14 @@ async function initAnalyzer() {
     // Check Python environment and dependencies
     const pythonEnv = await checkPythonEnvironment();
     
+    // Get system resources
+    const resources = getSystemResources();
+    
     console.log(`Analyzer initialized. Python dependencies available: 
       - librosa: ${pythonEnv.pythonHasLibrosa ? 'Yes' : 'No'}
-      - spleeter: ${pythonEnv.pythonHasSpleeter ? 'Yes' : 'No'}`);
+      - spleeter: ${pythonEnv.pythonHasSpleeter ? 'Yes' : 'No'}
+      - System resources: ${resources.totalMemoryGB}GB RAM, ${resources.cpuCount} CPUs
+      - Resource mode: ${resources.isLowResourceSystem ? 'Low' : 'Normal'}`);
     
     return true;
   } catch (error) {
@@ -45,9 +51,12 @@ async function analyzeAudio(filePath, options = {}) {
     
     console.log(`Analyzing audio file: ${path.basename(filePath)}`);
     
+    // Get system resources
+    const resources = getSystemResources();
+    
     // Default options
     const defaultOptions = {
-      lightMode: config.python.fallbacks.useFallbackAnalysis,
+      lightMode: config.python.fallbacks.useFallbackAnalysis || resources.isLowResourceSystem,
       useCache: true,
       cachePath: null
     };
@@ -57,7 +66,7 @@ async function analyzeAudio(filePath, options = {}) {
     
     // Generate cache path if not provided
     if (opts.useCache && !opts.cachePath) {
-      const cacheDir = path.join(config.fileStorage.uploadDir, 'cache');
+      const cacheDir = path.join(pathResolver.getUploadDir(), 'cache');
       if (!fs.existsSync(cacheDir)) {
         fs.mkdirSync(cacheDir, { recursive: true });
       }

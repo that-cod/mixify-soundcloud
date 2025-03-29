@@ -7,6 +7,7 @@
 const { processAudio, cleanupProcessedFiles, shouldUseLightMode, getAudioFileInfo } = require('./processor');
 const { analyzeAudio, initAnalyzer } = require('./analyzer');
 const { separateTracks, initStemSeparator } = require('./stemSeparator');
+const { fileManager } = require('../utils/systemUtils');
 
 /**
  * Initialize all audio processing modules
@@ -15,6 +16,12 @@ const { separateTracks, initStemSeparator } = require('./stemSeparator');
 async function initAudioProcessing() {
   try {
     console.log('Initializing audio processing modules...');
+    
+    // Ensure all required directories exist
+    fileManager.ensureDirectoriesExist();
+    
+    // Clean up any old temporary files
+    fileManager.cleanupTempFiles();
     
     // Initialize analyzer
     await initAnalyzer();
