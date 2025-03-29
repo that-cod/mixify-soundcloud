@@ -1,321 +1,308 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
-import { Volume2, VolumeX, Music, Mic, Disc3 } from 'lucide-react';
-import { WaveformDisplay } from './WaveformDisplay';
-import { AudioEffectsPanel } from './AudioEffectsPanel';
+import { 
+  Music, 
+  Plus, 
+  Trash2,
+  Save,
+  Download,
+  Pause,
+  Play,
+  SkipBack,
+  Settings,
+  Sliders,
+  Volume2
+} from 'lucide-react';
 import { useMultiTrackMixer } from '@/hooks/useMultiTrackMixer';
-import { MixTrack } from '@/types/audio';
+import { MixTrack, AudioFeatures } from '@/types/audio';
+import { WaveformDisplay } from './WaveformDisplay';
+import { AudioUploader } from './AudioUploader';
+import { TrackAnalysis } from './TrackAnalysis';
+import { AudioEffectsPanel } from './AudioEffectsPanel';
+import { useToast } from '@/hooks/use-toast';
 
-interface MultiTrackMixerProps {
-  initialTracks?: MixTrack[];
-}
-
-export function MultiTrackMixer({ initialTracks = [] }: MultiTrackMixerProps) {
+export const MultiTrackMixer: React.FC = () => {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'tracks' | 'effects' | 'mixer'>('tracks');
+  
   const {
     tracks,
+    mixedTrackUrl,
     isAnalyzing,
     isMixing,
+    isPlaying,
+    masterVolume,
+    analyzeProgress,
     mixProgress,
-    mixedTrackUrl,
+    
     addTrack,
+    removeTrack,
     updateTrackVolume,
     updateTrackPan,
-    toggleTrackMute,
-    toggleTrackSolo,
     updateTrackEffect,
-    removeTrack,
-    createMix,
-    separateTrackStems
+    toggleMute,
+    toggleSolo,
+    startMixing,
+    togglePlayback,
+    restartPlayback,
+    setMasterVolume,
+    handleWavesurferReady
   } = useMultiTrackMixer();
   
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [trackUploadDialogOpen, setTrackUploadDialogOpen] = useState(false);
-  
-  // Find currently selected track
-  const selectedTrack = selectedTrackId 
-    ? tracks.find(t => t.id === selectedTrackId) 
-    : tracks.length > 0 ? tracks[0] : null;
-  
-  // Handle track selection
-  const handleSelectTrack = (trackId: string) => {
-    setSelectedTrackId(trackId);
-  };
-  
-  // Handle vocal removal
-  const handleRemoveVocals = async (trackId: string) => {
-    // In a real implementation, this would call a function to process the track
-    await separateTrackStems(trackId);
-  };
-  
-  // Update effect for selected track
-  const handleUpdateEffect = <K extends keyof MixTrack['effects']>(
-    effectType: K,
-    settings: Partial<MixTrack['effects'][K]>
-  ) => {
-    if (selectedTrackId) {
-      updateTrackEffect(selectedTrackId, effectType, settings);
+  // Automatically switch to mixer tab when mixing is complete
+  useEffect(() => {
+    if (mixedTrackUrl) {
+      setActiveTab('mixer');
     }
+  }, [mixedTrackUrl]);
+
+  const handleTrackUpload = (url: string, name: string) => {
+    addTrack(url, name);
+    toast({
+      title: "Track Added",
+      description: `${name} has been added to your mix.`,
+    });
   };
   
-  // Simple track upload handler (mock implementation)
-  const handleTrackUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    
-    // In a real implementation, this would upload the file to a server
-    // For demo purposes, we'll create a fake URL
-    const file = files[0];
-    const url = URL.createObjectURL(file);
-    
-    // Add the track to the mixer
-    const trackId = await addTrack(url, file.name);
-    setSelectedTrackId(trackId);
+  const handleRemoveTrack = (id: string) => {
+    removeTrack(id);
   };
   
-  return (
-    <div className="w-full space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>Multi-Track Mixer</span>
-            <Button onClick={() => document.getElementById('track-upload')?.click()}>
-              Add Track
+  const handleStartMixing = () => {
+    startMixing();
+  };
+  
+  // Handle download button click
+  const handleDownload = () => {
+    // Download logic handled through the href attribute
+  };
+  
+  // Track card component
+  const TrackCard = ({ track, index }: { track: MixTrack, index: number }) => {
+    return (
+      <Card className="relative mb-4 overflow-hidden glass-card border-white/10">
+        <CardHeader className="py-3 px-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-md flex items-center">
+              <Music className="h-4 w-4 mr-2" />
+              {track.name}
+            </CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => handleRemoveTrack(track.id)}
+              className="h-7 w-7 p-0 rounded-full"
+            >
+              <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
             </Button>
-            <input
-              id="track-upload"
-              type="file"
-              accept="audio/*"
-              className="hidden"
-              onChange={handleTrackUpload}
-            />
-          </CardTitle>
+          </div>
         </CardHeader>
-        
-        <CardContent>
-          {tracks.length === 0 ? (
-            <div className="text-center py-8">
-              <Music className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-500">No tracks added yet. Upload a track to get started.</p>
+        <CardContent className="pt-0 px-4 pb-3">
+          {isAnalyzing && !track.features ? (
+            <div className="h-16 flex items-center justify-center">
+              <div className="text-sm text-white/50">Analyzing track...</div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Track List */}
-              <div className="space-y-4 lg:col-span-1">
-                <h3 className="text-lg font-medium">Tracks</h3>
-                
-                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                  {tracks.map(track => (
-                    <div 
-                      key={track.id}
-                      className={`p-3 rounded-md flex items-center justify-between ${
-                        selectedTrackId === track.id ? 'bg-primary/10' : 'bg-secondary/10'
-                      }`}
-                      onClick={() => handleSelectTrack(track.id)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        {track.features?.bpm ? <Disc3 size={18} /> : <Music size={18} />}
-                        <span className="font-medium truncate max-w-[150px]">{track.name}</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={(e) => { e.stopPropagation(); toggleTrackMute(track.id); }}
-                        >
-                          {track.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                        </Button>
-                        
-                        <Button
-                          variant={track.soloed ? "default" : "ghost"}
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={(e) => { e.stopPropagation(); toggleTrackSolo(track.id); }}
-                        >
-                          S
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+            <>
+              {track.features && (
+                <div className="mb-2">
+                  <TrackAnalysis audioFeatures={track.features} isCompact={true} />
                 </div>
-                
-                <Button 
-                  className="w-full" 
-                  disabled={tracks.length === 0 || isMixing} 
-                  onClick={createMix}
-                >
-                  {isMixing ? `Mixing... ${mixProgress}%` : 'Create Mix'}
-                </Button>
+              )}
+              
+              <div className="grid grid-cols-2 gap-3 my-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-white/70">Volume</span>
+                    <span className="text-xs text-white/50">{Math.round(track.volume * 100)}%</span>
+                  </div>
+                  <Slider
+                    value={[track.volume * 100]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(values) => updateTrackVolume(track.id, values[0] / 100)}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-white/70">Pan</span>
+                    <span className="text-xs text-white/50">
+                      {track.pan === 0 ? "C" : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[track.pan * 100]}
+                    min={-100}
+                    max={100}
+                    step={1}
+                    onValueChange={(values) => updateTrackPan(track.id, values[0] / 100)}
+                  />
+                </div>
               </div>
               
-              {/* Track Editor */}
-              <div className="lg:col-span-2">
-                {selectedTrack ? (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-medium">{selectedTrack.name}</h3>
-                    
-                    <WaveformDisplay 
-                      audioUrl={selectedTrack.url} 
-                      color="#4f46e5"
-                      height={100}
-                    />
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <Label>Volume ({Math.round(selectedTrack.volume * 100)}%)</Label>
-                        <div className="flex items-center space-x-2">
-                          <VolumeX size={18} />
-                          <Slider
-                            value={[selectedTrack.volume]}
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            onValueChange={([value]) => updateTrackVolume(selectedTrack.id, value)}
-                            className="flex-1"
-                          />
-                          <Volume2 size={18} />
-                        </div>
-                        
-                        <Label>Pan</Label>
-                        <Slider
-                          value={[selectedTrack.pan]}
-                          min={-1}
-                          max={1}
-                          step={0.01}
-                          onValueChange={([value]) => updateTrackPan(selectedTrack.id, value)}
-                        />
-                        
-                        {!selectedTrack.stems && (
-                          <Button 
-                            variant="outline" 
-                            onClick={() => handleRemoveVocals(selectedTrack.id)}
-                          >
-                            <Mic className="mr-2 h-4 w-4" />
-                            Separate Vocals & Instruments
-                          </Button>
-                        )}
-                        
-                        {selectedTrack.stems && (
-                          <div className="pt-2">
-                            <h4 className="font-medium mb-2">Stems</h4>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button size="sm" variant="outline">Vocals</Button>
-                              <Button size="sm" variant="outline">Drums</Button>
-                              <Button size="sm" variant="outline">Bass</Button>
-                              <Button size="sm" variant="outline">Other</Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div>
-                        {selectedTrack.features && (
-                          <div className="bg-secondary/10 p-3 rounded-md space-y-2">
-                            <h4 className="font-medium">Track Analysis</h4>
-                            <div className="grid grid-cols-2 gap-y-2 text-sm">
-                              <span>BPM:</span>
-                              <span>{selectedTrack.features.bpm}</span>
-                              
-                              <span>Key:</span>
-                              <span>{selectedTrack.features.key}</span>
-                              
-                              <span>Energy:</span>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className="bg-primary h-2 rounded-full" 
-                                  style={{ width: `${selectedTrack.features.energy * 100}%` }}
-                                ></div>
-                              </div>
-                              
-                              <span>Clarity:</span>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className="bg-primary h-2 rounded-full" 
-                                  style={{ width: `${selectedTrack.features.clarity * 100}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {selectedTrack.features?.harmonicProfile && (
-                          <div className="bg-secondary/10 p-3 rounded-md space-y-2 mt-3">
-                            <h4 className="font-medium">Harmonic Analysis</h4>
-                            <div className="text-sm">
-                              <p>Tonality: {selectedTrack.features.harmonicProfile.tonality}</p>
-                              <p>Structure: {selectedTrack.features.harmonicProfile.harmonicStructure}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <Tabs defaultValue="effects" className="w-full">
-                      <TabsList className="grid grid-cols-2">
-                        <TabsTrigger value="effects">Effects</TabsTrigger>
-                        <TabsTrigger value="advanced">Advanced</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="effects">
-                        <AudioEffectsPanel 
-                          effects={selectedTrack.effects}
-                          onUpdateEffect={handleUpdateEffect}
-                        />
-                      </TabsContent>
-                      
-                      <TabsContent value="advanced">
-                        <Card>
-                          <CardContent className="pt-6">
-                            <div className="space-y-4">
-                              <Button 
-                                variant="outline" 
-                                className="w-full"
-                                onClick={() => removeTrack(selectedTrack.id)}
-                              >
-                                Remove Track
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">Select a track to edit</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Mixed Track */}
-          {mixedTrackUrl && (
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="text-lg font-medium mb-4">Mixed Track</h3>
-              <WaveformDisplay 
-                audioUrl={mixedTrackUrl} 
-                color="#10b981"
-                height={100}
-              />
-              <div className="flex justify-end mt-4">
-                <Button 
-                  as="a" 
-                  href={mixedTrackUrl} 
-                  download="mixed-track.mp3"
+              <div className="flex items-center justify-between space-x-2 mt-2">
+                <Button
+                  variant={track.muted ? "default" : "outline"}
+                  size="sm"
+                  className={`flex-1 h-8 text-xs ${track.muted ? "bg-amber-800 hover:bg-amber-700" : ""}`}
+                  onClick={() => toggleMute(track.id)}
                 >
-                  Download Mix
+                  {track.muted ? "Unmute" : "Mute"}
+                </Button>
+                
+                <Button
+                  variant={track.soloed ? "default" : "outline"}
+                  size="sm"
+                  className={`flex-1 h-8 text-xs ${track.soloed ? "bg-green-800 hover:bg-green-700" : ""}`}
+                  onClick={() => toggleSolo(track.id)}
+                >
+                  {track.soloed ? "Unsolo" : "Solo"}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-8 text-xs"
+                  onClick={() => setActiveTab('effects')}
+                >
+                  <Sliders className="h-3 w-3 mr-1" />
+                  FX
                 </Button>
               </div>
-            </div>
+            </>
           )}
         </CardContent>
       </Card>
+    );
+  };
+  
+  return (
+    <div className="mx-auto max-w-7xl">
+      <Tabs defaultValue="tracks" value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="tracks">Tracks</TabsTrigger>
+          <TabsTrigger value="effects">Effects</TabsTrigger>
+          <TabsTrigger value="mixer">Mixer</TabsTrigger>
+        </TabsList>
+        
+        {/* Tracks Tab */}
+        <TabsContent value="tracks" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Add Track Card */}
+            <Card className="glass-card border-dashed border-white/20 hover:border-white/40 transition-all">
+              <CardContent className="flex flex-col items-center justify-center p-6 h-48">
+                <AudioUploader onUploadComplete={handleTrackUpload} />
+              </CardContent>
+            </Card>
+            
+            {/* Track List */}
+            {tracks.map((track, index) => (
+              <TrackCard key={track.id} track={track} index={index} />
+            ))}
+          </div>
+          
+          {tracks.length > 1 && (
+            <div className="flex justify-center mt-8">
+              <Button 
+                onClick={handleStartMixing}
+                disabled={isMixing || isAnalyzing || tracks.some(t => !t.features)}
+                className="bg-mixify-purple hover:bg-mixify-purple-dark"
+              >
+                {isMixing ? (
+                  <>Processing Mix ({mixProgress}%)...</>
+                ) : (
+                  <>Mix Tracks</>
+                )}
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+        
+        {/* Effects Tab */}
+        <TabsContent value="effects" className="space-y-6">
+          <AudioEffectsPanel 
+            tracks={tracks}
+            onUpdateEffect={updateTrackEffect}
+          />
+        </TabsContent>
+        
+        {/* Mixer Tab */}
+        <TabsContent value="mixer" className="space-y-6">
+          {mixedTrackUrl ? (
+            <div className="space-y-6">
+              <h2 className="text-xl font-semibold">Mixed Track</h2>
+              <WaveformDisplay 
+                audioUrl={mixedTrackUrl} 
+                color="#FF5500"
+                onReady={handleWavesurferReady}
+              />
+              
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={restartPlayback}
+                  >
+                    <SkipBack className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="default"
+                    size="icon"
+                    onClick={togglePlayback}
+                    className="bg-mixify-purple hover:bg-mixify-purple-dark"
+                  >
+                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center space-x-2 flex-1 max-w-xs">
+                  <Volume2 className="h-4 w-4 text-white/70" />
+                  <Slider
+                    value={[masterVolume * 100]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(values) => setMasterVolume(values[0] / 100)}
+                  />
+                  <span className="text-sm text-white/70 w-8 text-right">{Math.round(masterVolume * 100)}%</span>
+                </div>
+                
+                <div>
+                  {/* Fixed the button to use a proper download link */}
+                  <a 
+                    href={mixedTrackUrl} 
+                    download="mixify-multi-track.mp3"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Mix
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center">
+              <Settings className="h-12 w-12 text-white/30 mb-4" />
+              <h3 className="text-xl font-medium mb-2">No Mix Available</h3>
+              <p className="text-white/60 mb-6 max-w-md">
+                Add at least two tracks and mix them to see the result here.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => setActiveTab('tracks')}
+              >
+                Go to Tracks
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
-}
+};

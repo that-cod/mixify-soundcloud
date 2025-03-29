@@ -5,11 +5,11 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 
 // Pages
-import Home from '@/pages/Home';
+import Home from '@/pages/Index'; // Changed from Home to Index
 import Login from '@/pages/Login';
-import Register from '@/pages/Register';
+import Register from '@/pages/Signup'; // Changed from Register to Signup
 import Mixer from '@/pages/Mixer';
-import Dashboard from '@/pages/Dashboard';
+import Dashboard from '@/pages/NotFound'; // Temporary using NotFound as Dashboard
 import MultiTrackMixer from '@/pages/MultiTrackMixer';
 
 function App() {

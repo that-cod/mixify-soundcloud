@@ -36,8 +36,8 @@ export interface PromptAnalysisResultType {
   recommendedSettings: MixSettingsType;
 }
 
-// Re-export AudioFeatures
-export { AudioFeatures };
+// Using export type for re-exporting types when isolatedModules is enabled
+export type { AudioFeatures };
 
 // Define AnthropicResponse
 export interface AnthropicResponse {

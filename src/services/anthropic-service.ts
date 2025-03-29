@@ -1,9 +1,12 @@
 
-import { API_URL, MODEL, MAX_TOKENS, MixingInstruction, PromptAnalysisResult } from './anthropic-types';
+import { API_URL, MODEL, MAX_TOKENS, MixingInstruction, PromptAnalysisResult, AnthropicResponse, DEFAULT_MIX_SETTINGS } from './anthropic-types';
 import { MixSettingsType } from '@/types/mixer';
 import { AudioFeatures } from '@/types/audio';
 import { getSystemPrompt } from './anthropic-prompt';
 import { parseClaudeResponse, handleApiError, validateApiKey } from './anthropic-utils';
+
+// Explicitly export the imported type so it's available to other modules
+export type { PromptAnalysisResult };
 
 /**
  * Main function to analyze prompt using Claude API
