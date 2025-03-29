@@ -6,8 +6,10 @@
 
 const { mixTracks } = require('./mixerCore');
 const { convertWavToMp3 } = require('./mixerUtils');
+const { optimizeSettings } = require('./settingsOptimizer');
 
 module.exports = {
   mixTracks,
-  convertWavToMp3
+  convertWavToMp3,
+  optimizeSettings
 };
