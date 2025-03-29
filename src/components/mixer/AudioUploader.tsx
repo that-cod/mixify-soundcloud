@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Music2, X, Loader2, AlertCircle } from 'lucide-react';
@@ -5,13 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  supabase, 
-  STORAGE_BUCKET, 
-  createBucketIfNotExists,
-  uploadFileToBucket,
-  verifyBucketAccess
-} from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
+  AUDIO_BUCKET, 
+  checkBucketStatus, 
+  uploadAudioFile,
+  type BucketStatus
+} from '@/services/storage-service';
 
 interface AudioUploaderProps {
   trackNumber: 1 | 2;
@@ -22,61 +21,56 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [bucketStatus, setBucketStatus] = useState<{
-    exists: boolean;
-    canUpload: boolean;
-    isPublic: boolean;
-    errorMessage?: string;
-  } | null>(null);
+  const [bucketStatus, setBucketStatus] = useState<BucketStatus | null>(null);
   const [bucketCheckInProgress, setBucketCheckInProgress] = useState(true);
   const { toast } = useToast();
 
-  // Check if our storage bucket exists when component mounts
+  // Check storage bucket status when component mounts
   useEffect(() => {
-    const checkBucket = async () => {
-      console.log(`AudioUploader ${trackNumber}: Verifying bucket "${STORAGE_BUCKET}" status...`);
+    const verifyBucketAccess = async () => {
       try {
+        console.log(`AudioUploader ${trackNumber}: Checking storage bucket...`);
         setBucketCheckInProgress(true);
         
-        // Use the new verify function instead
-        const status = await verifyBucketAccess(STORAGE_BUCKET);
+        const status = await checkBucketStatus();
         setBucketStatus(status);
         
+        // Show appropriate notifications based on bucket status
         if (!status.exists) {
-          console.error(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" doesn't exist`);
+          console.error(`Bucket "${AUDIO_BUCKET}" doesn't exist`);
           toast({
-            title: "Storage Missing",
-            description: status.errorMessage || `Bucket "${STORAGE_BUCKET}" doesn't exist in your Supabase project.`,
+            title: "Storage Not Found",
+            description: status.errorMessage || `Bucket "${AUDIO_BUCKET}" doesn't exist in your Supabase project.`,
             variant: "destructive",
           });
         } else if (!status.canUpload) {
-          console.error(`AudioUploader ${trackNumber}: Cannot upload to bucket "${STORAGE_BUCKET}"`);
+          console.error(`Cannot upload to bucket "${AUDIO_BUCKET}"`);
           toast({
             title: "Upload Permission Issue",
             description: status.errorMessage || "You don't have permission to upload to this bucket.",
             variant: "destructive",
           });
         } else if (!status.isPublic) {
-          console.warn(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" is not public`);
+          console.warn(`Bucket "${AUDIO_BUCKET}" is not public`);
           toast({
             title: "Storage Warning",
             description: "The storage bucket is not set to public. Your uploaded files might not be accessible.",
-            variant: "warning", // Now we can use the warning variant we added
+            variant: "warning",
           });
         } else {
-          console.log(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" is ready for use`);
+          console.log(`Bucket "${AUDIO_BUCKET}" is ready for uploads`);
         }
-      } catch (err) {
-        console.error(`AudioUploader ${trackNumber}: Error verifying bucket:`, err);
+      } catch (err: any) {
+        console.error(`Error verifying bucket:`, err);
         setBucketStatus({
           exists: false,
           canUpload: false,
           isPublic: false,
-          errorMessage: err instanceof Error ? err.message : 'Unknown error verifying bucket'
+          errorMessage: err.message || 'Unknown error checking storage'
         });
         toast({
-          title: "Storage Verification Error",
-          description: "Could not verify storage bucket status. Please check console for details.",
+          title: "Storage Check Failed",
+          description: "Could not verify storage bucket status.",
           variant: "destructive",
         });
       } finally {
@@ -84,20 +78,21 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       }
     };
     
-    checkBucket();
+    verifyBucketAccess();
   }, [toast, trackNumber]);
 
+  // Handle file drop
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
     
     if (!selectedFile) {
-      console.log(`AudioUploader ${trackNumber}: No file selected`);
+      console.log(`No file selected`);
       return;
     }
     
     // Validate file type
     if (!selectedFile.type.startsWith('audio/')) {
-      console.warn(`AudioUploader ${trackNumber}: Invalid file type:`, selectedFile.type);
+      console.warn(`Invalid file type:`, selectedFile.type);
       toast({
         title: "Invalid file type",
         description: "Please upload an audio file (MP3, WAV, etc).",
@@ -108,7 +103,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
     
     // Validate file size (20MB max)
     if (selectedFile.size > 20 * 1024 * 1024) {
-      console.warn(`AudioUploader ${trackNumber}: File too large:`, (selectedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
+      console.warn(`File too large:`, (selectedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
       toast({
         title: "File too large",
         description: "Please upload an audio file smaller than 20MB.",
@@ -117,14 +112,14 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       return;
     }
     
-    console.log(`AudioUploader ${trackNumber}: File selected:`, {
+    console.log(`File selected:`, {
       name: selectedFile.name,
       type: selectedFile.type,
       size: `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`
     });
     
     setFile(selectedFile);
-  }, [toast, trackNumber]);
+  }, [toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -134,17 +129,18 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
     maxFiles: 1,
   });
 
+  // Handle file upload
   const uploadFile = async () => {
     if (!file) {
-      console.warn(`AudioUploader ${trackNumber}: Cannot upload - no file selected`);
+      console.warn(`Cannot upload - no file selected`);
       return;
     }
     
     if (!bucketStatus?.canUpload) {
-      console.error(`AudioUploader ${trackNumber}: Cannot upload - ${bucketStatus?.errorMessage || 'bucket not accessible'}`);
+      console.error(`Cannot upload - ${bucketStatus?.errorMessage || 'bucket not accessible'}`);
       toast({
         title: "Storage not accessible",
-        description: bucketStatus?.errorMessage || `Cannot upload to bucket "${STORAGE_BUCKET}".`,
+        description: bucketStatus?.errorMessage || `Cannot upload to the storage bucket.`,
         variant: "destructive",
       });
       return;
@@ -152,39 +148,16 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
 
     try {
       setUploading(true);
-      setProgress(5); // Show some initial progress to the user
+      setProgress(5); // Start with some initial progress
       
-      // Create unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `track-${trackNumber}/${fileName}`;
-      
-      console.log(`AudioUploader ${trackNumber}: Starting upload...`, { 
-        bucketName: STORAGE_BUCKET,
-        filePath,
-        fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB` 
-      });
-      
-      // Simulate progress steps for better UX since we can't track real progress
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const next = prev + 15;
-          return next < 90 ? next : prev;
-        });
-      }, 500);
-      
-      // Use the improved upload function
-      const result = await uploadFileToBucket(
+      // Use our new upload service
+      const result = await uploadAudioFile(
         file, 
-        filePath, 
+        trackNumber,
         (progress) => setProgress(progress)
       );
       
-      // Clear interval and set progress to 100%
-      clearInterval(progressInterval);
-      setProgress(100);
-      
-      console.log(`AudioUploader ${trackNumber}: Upload completed`, result);
+      console.log(`Upload completed:`, result);
       
       // Notify parent component
       onUploadComplete(result.publicUrl, file.name);
@@ -194,16 +167,16 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
         description: `Track ${trackNumber} uploaded successfully.`,
       });
     } catch (error: any) {
-      console.error(`AudioUploader ${trackNumber}: Error uploading file:`, error);
+      console.error(`Error uploading file:`, error);
       
-      // Show more specific error messages
+      // Show user-friendly error message
       let errorMessage = "An error occurred during upload.";
       
       if (error.message) {
         if (error.message.includes('permission') || error.message.includes('authorized')) {
           errorMessage = "Permission denied. Check Supabase storage settings.";
         } else if (error.message.includes('not found') || error.message.includes('404')) {
-          errorMessage = `Bucket "${STORAGE_BUCKET}" not found. Check Supabase storage.`;
+          errorMessage = `Storage bucket not found. Check Supabase storage.`;
         } else if (error.message.includes('network') || error.message.includes('connection')) {
           errorMessage = "Network error. Check your internet connection.";
         } else {
@@ -220,9 +193,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       setUploading(false);
       
       // Reset progress after a brief delay
-      setTimeout(() => {
-        setProgress(0);
-      }, 1000);
+      setTimeout(() => setProgress(0), 1000);
     }
   };
 
@@ -245,7 +216,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
             <AlertCircle className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
             <div>
               <p className="text-sm text-red-400">
-                {bucketStatus.errorMessage || `Storage bucket "${STORAGE_BUCKET}" does not exist. Please create it in your Supabase project.`}
+                {bucketStatus.errorMessage || `Storage bucket "${AUDIO_BUCKET}" does not exist. Please create it in your Supabase project.`}
               </p>
             </div>
           </div>
@@ -258,7 +229,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
             <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
             <div>
               <p className="text-sm text-yellow-400">
-                {bucketStatus.errorMessage || `You don't have permission to upload to bucket "${STORAGE_BUCKET}". Check your Supabase RLS policies.`}
+                {bucketStatus.errorMessage || `You don't have permission to upload. Check your Supabase RLS policies.`}
               </p>
             </div>
           </div>

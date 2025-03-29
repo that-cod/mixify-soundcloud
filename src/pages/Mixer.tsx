@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MicIcon, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import WaveSurfer from 'wavesurfer.js';
-import { STORAGE_BUCKET, verifyBucketAccess } from '@/lib/supabase';
+import { AUDIO_BUCKET, checkBucketStatus, type BucketStatus } from '@/services/storage-service';
 
 const Mixer: React.FC = () => {
   const { user } = useAuth();
@@ -26,12 +26,7 @@ const Mixer: React.FC = () => {
   const [mixedTrackUrl, setMixedTrackUrl] = useState<string | undefined>();
   
   // Storage states
-  const [bucketStatus, setBucketStatus] = useState<{
-    exists: boolean;
-    canUpload: boolean;
-    isPublic: boolean;
-    errorMessage?: string;
-  } | null>(null);
+  const [bucketStatus, setBucketStatus] = useState<BucketStatus | null>(null);
   const [storageBucketChecking, setStorageBucketChecking] = useState(true);
   
   // Analysis states (would be populated by backend)
@@ -65,41 +60,48 @@ const Mixer: React.FC = () => {
   
   // Check storage bucket on component mount
   useEffect(() => {
-    const checkStorage = async () => {
+    const verifyStorage = async () => {
       try {
         console.log("Mixer: Verifying storage bucket status...");
         setStorageBucketChecking(true);
-        const status = await verifyBucketAccess(STORAGE_BUCKET);
+        const status = await checkBucketStatus();
         setBucketStatus(status);
         
         if (!status.exists) {
-          console.error(`Mixer: Bucket "${STORAGE_BUCKET}" doesn't exist`);
+          console.error(`Bucket "${AUDIO_BUCKET}" doesn't exist`);
           toast({
             title: "Storage Not Available",
-            description: status.errorMessage || `Bucket "${STORAGE_BUCKET}" doesn't exist in your Supabase project.`,
+            description: status.errorMessage || `Bucket "${AUDIO_BUCKET}" doesn't exist in your Supabase project.`,
             variant: "destructive",
           });
         } else if (!status.canUpload) {
-          console.error(`Mixer: Cannot upload to bucket "${STORAGE_BUCKET}"`);
+          console.error(`Cannot upload to bucket "${AUDIO_BUCKET}"`);
           toast({
             title: "Upload Permission Issue",
             description: status.errorMessage || "You don't have permission to upload to this bucket.",
             variant: "destructive",
           });
+        } else if (!status.isPublic) {
+          console.warn(`Bucket "${AUDIO_BUCKET}" is not public`);
+          toast({
+            title: "Storage Warning", 
+            description: "The storage bucket is not set to public. Your uploaded files might not be accessible.",
+            variant: "warning",
+          });
         } else {
-          console.log(`Mixer: Bucket "${STORAGE_BUCKET}" is ready for use`);
+          console.log(`Bucket "${AUDIO_BUCKET}" is ready for use`);
         }
-      } catch (err) {
-        console.error("Mixer: Error verifying storage bucket:", err);
+      } catch (err: any) {
+        console.error("Error verifying storage bucket:", err);
         setBucketStatus({
           exists: false,
           canUpload: false,
           isPublic: false,
-          errorMessage: err instanceof Error ? err.message : 'Unknown error checking storage bucket'
+          errorMessage: err.message || 'Unknown error checking storage bucket'
         });
         toast({
           title: "Storage Error",
-          description: "Could not verify storage bucket status. Check console for details.",
+          description: "Could not verify storage bucket status.",
           variant: "destructive",
         });
       } finally {
@@ -107,7 +109,7 @@ const Mixer: React.FC = () => {
       }
     };
     
-    checkStorage();
+    verifyStorage();
   }, [toast]);
   
   // Redirect if not logged in
@@ -116,7 +118,7 @@ const Mixer: React.FC = () => {
   }
   
   const handleTrack1Upload = (url: string, fileName: string) => {
-    console.log("Mixer: Track 1 upload complete:", { url, fileName });
+    console.log("Track 1 upload complete:", { url, fileName });
     setTrack1Url(url);
     setTrack1Name(fileName);
     setTrack1Analysis(prev => ({ ...prev, isLoading: true }));
@@ -134,7 +136,7 @@ const Mixer: React.FC = () => {
   };
   
   const handleTrack2Upload = (url: string, fileName: string) => {
-    console.log("Mixer: Track 2 upload complete:", { url, fileName });
+    console.log("Track 2 upload complete:", { url, fileName });
     setTrack2Url(url);
     setTrack2Name(fileName);
     setTrack2Analysis(prev => ({ ...prev, isLoading: true }));
@@ -248,7 +250,7 @@ const Mixer: React.FC = () => {
               <div>
                 <h3 className="text-md text-red-400 font-medium">Storage Not Available</h3>
                 <p className="text-sm text-red-300/80">
-                  {bucketStatus.errorMessage || `The storage bucket "${STORAGE_BUCKET}" does not exist. Please create it in your Supabase project with public access enabled.`}
+                  {bucketStatus.errorMessage || `The storage bucket "${AUDIO_BUCKET}" does not exist. Please create it in your Supabase project with public access enabled.`}
                 </p>
               </div>
             </div>
@@ -262,7 +264,7 @@ const Mixer: React.FC = () => {
               <div>
                 <h3 className="text-md text-yellow-400 font-medium">Upload Permission Issue</h3>
                 <p className="text-sm text-yellow-300/80">
-                  {bucketStatus.errorMessage || `You don't have permission to upload to "${STORAGE_BUCKET}". Check your Supabase RLS policies.`}
+                  {bucketStatus.errorMessage || `You don't have permission to upload to the storage bucket. Check your Supabase RLS policies.`}
                 </p>
               </div>
             </div>
