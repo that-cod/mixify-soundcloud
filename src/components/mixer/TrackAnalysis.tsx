@@ -3,28 +3,24 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AudioWaveform, Music3, Clock } from 'lucide-react';
-
-interface AudioFeatures {
-  bpm: number;
-  key: string;
-  energy: number;
-  clarity: number;
-}
+import { AudioFeatures } from '@/types/audio';
 
 interface TrackAnalysisProps {
   trackName: string;
-  isLoading?: boolean;
   features?: AudioFeatures | null;
+  isLoading?: boolean;
   duration?: number;
   analyzingProgress?: number;
+  isCompact?: boolean;
 }
 
 export const TrackAnalysis: React.FC<TrackAnalysisProps> = ({
   trackName,
-  isLoading = false,
   features = null,
+  isLoading = false,
   duration = 0,
   analyzingProgress = 0,
+  isCompact = false,
 }) => {
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -66,44 +62,31 @@ export const TrackAnalysis: React.FC<TrackAnalysisProps> = ({
   }
 
   return (
-    <Card className="glass-card overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
+    <Card className={`glass-card overflow-hidden ${isCompact ? 'p-2' : ''}`}>
+      <CardHeader className={isCompact ? "p-2 pb-1" : "pb-2"}>
+        <CardTitle className={`${isCompact ? 'text-sm' : 'text-base'} flex items-center gap-2`}>
           <Music3 className="h-4 w-4 text-mixify-purple-light" />
           <div className="truncate">{trackName}</div>
         </CardTitle>
-        <CardDescription className="text-xs">Analysis Results</CardDescription>
+        {!isCompact && <CardDescription className="text-xs">Analysis Results</CardDescription>}
       </CardHeader>
-      <CardContent className="py-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col items-center p-3 rounded-md bg-white/5">
-            <span className="text-xs text-white/60 mb-1">Genre</span>
-            <Badge variant="outline" className="font-normal text-xs bg-white/10">
-              {features ? "Detected" : "Unknown"}
-            </Badge>
-          </div>
-          <div className="flex flex-col items-center p-3 rounded-md bg-white/5">
+      <CardContent className={isCompact ? "p-2 py-1" : "py-4"}>
+        <div className={`grid grid-cols-2 gap-${isCompact ? '2' : '4'}`}>
+          <div className={`flex flex-col items-center p-${isCompact ? '1' : '3'} rounded-md bg-white/5`}>
             <span className="text-xs text-white/60 mb-1">Tempo</span>
-            <span className="text-base font-medium">
+            <span className={`${isCompact ? 'text-sm' : 'text-base'} font-medium`}>
               {features ? `${features.bpm}` : "0"} <span className="text-xs">BPM</span>
             </span>
           </div>
-          <div className="flex flex-col items-center p-3 rounded-md bg-white/5">
+          <div className={`flex flex-col items-center p-${isCompact ? '1' : '3'} rounded-md bg-white/5`}>
             <span className="text-xs text-white/60 mb-1">Key</span>
-            <span className="text-base font-medium">
+            <span className={`${isCompact ? 'text-sm' : 'text-base'} font-medium`}>
               {features ? features.key : "Unknown"}
             </span>
           </div>
-          <div className="flex flex-col items-center p-3 rounded-md bg-white/5">
-            <span className="text-xs text-white/60 mb-1">Duration</span>
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3 text-white/70" />
-              <span className="text-base font-medium">{formatDuration(duration)}</span>
-            </div>
-          </div>
         </div>
         
-        {features && (
+        {features && !isCompact && (
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div className="flex flex-col items-center p-3 rounded-md bg-white/5">
               <span className="text-xs text-white/60 mb-1">Energy</span>

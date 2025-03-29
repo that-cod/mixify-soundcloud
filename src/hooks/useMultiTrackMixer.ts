@@ -47,6 +47,11 @@ export function useMultiTrackMixer() {
   const [mixProgress, setMixProgress] = useState(0);
   const [mixedTrackUrl, setMixedTrackUrl] = useState<string | undefined>();
   
+  // Add missing states
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [masterVolume, setMasterVolume] = useState(0.8);
+  const [analyzeProgress, setAnalyzeProgress] = useState(0);
+  
   const { toast } = useToast();
   
   // Add a new track to the mixer
@@ -86,14 +91,26 @@ export function useMultiTrackMixer() {
     if (!track) return;
     
     setIsAnalyzing(true);
+    setAnalyzeProgress(0);
     
     try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setAnalyzeProgress(prev => {
+          const newProgress = prev + 5;
+          return newProgress < 95 ? newProgress : prev;
+        });
+      }, 300);
+      
       // Analyze audio features
       const features = await analyzeAudio(track.url, {
         detectBeats: true,
         analyzeHarmonics: true,
         quality: 'medium'
       });
+      
+      clearInterval(progressInterval);
+      setAnalyzeProgress(100);
       
       // Update track with features
       setTracks(prev => prev.map(t => 
@@ -113,6 +130,7 @@ export function useMultiTrackMixer() {
       });
     } finally {
       setIsAnalyzing(false);
+      setAnalyzeProgress(0);
     }
   };
   
@@ -168,14 +186,14 @@ export function useMultiTrackMixer() {
   };
   
   // Toggle track mute
-  const toggleTrackMute = (trackId: string) => {
+  const toggleMute = (trackId: string) => {
     setTracks(prev => prev.map(t => 
       t.id === trackId ? { ...t, muted: !t.muted } : t
     ));
   };
   
   // Toggle track solo
-  const toggleTrackSolo = (trackId: string) => {
+  const toggleSolo = (trackId: string) => {
     setTracks(prev => prev.map(t => 
       t.id === trackId ? { ...t, soloed: !t.soloed } : t
     ));
@@ -263,21 +281,50 @@ export function useMultiTrackMixer() {
     }
   };
   
+  // Add missing functions
+  const startMixing = () => {
+    return createMix();
+  };
+  
+  const togglePlayback = () => {
+    setIsPlaying(!isPlaying);
+  };
+  
+  const restartPlayback = () => {
+    // Restart playback logic
+  };
+  
+  const setMasterVolume = (volume: number) => {
+    setMasterVolume(volume);
+  };
+  
+  const handleWavesurferReady = (wavesurfer: any) => {
+    // Handle wavesurfer ready
+  };
+  
   return {
     tracks,
     isAnalyzing,
     isMixing,
     mixProgress,
     mixedTrackUrl,
+    isPlaying,
+    masterVolume,
+    analyzeProgress,
     addTrack,
     analyzeTrack,
     separateTrackStems,
     updateTrackVolume,
     updateTrackPan,
-    toggleTrackMute,
-    toggleTrackSolo,
+    toggleMute,
+    toggleSolo,
     updateTrackEffect,
     removeTrack,
-    createMix
+    createMix,
+    startMixing,
+    togglePlayback,
+    restartPlayback,
+    setMasterVolume,
+    handleWavesurferReady
   };
 }

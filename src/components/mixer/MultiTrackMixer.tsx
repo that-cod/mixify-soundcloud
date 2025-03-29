@@ -76,11 +76,6 @@ export const MultiTrackMixer: React.FC = () => {
     startMixing();
   };
   
-  // Handle download button click
-  const handleDownload = () => {
-    // Download logic handled through the href attribute
-  };
-  
   // Track card component
   const TrackCard = ({ track, index }: { track: MixTrack, index: number }) => {
     return (
@@ -110,7 +105,11 @@ export const MultiTrackMixer: React.FC = () => {
             <>
               {track.features && (
                 <div className="mb-2">
-                  <TrackAnalysis audioFeatures={track.features} isCompact={true} />
+                  <TrackAnalysis 
+                    trackName={track.name}
+                    features={track.features}
+                    isCompact={true}
+                  />
                 </div>
               )}
               
@@ -196,7 +195,10 @@ export const MultiTrackMixer: React.FC = () => {
             {/* Add Track Card */}
             <Card className="glass-card border-dashed border-white/20 hover:border-white/40 transition-all">
               <CardContent className="flex flex-col items-center justify-center p-6 h-48">
-                <AudioUploader onUploadComplete={handleTrackUpload} />
+                <AudioUploader 
+                  trackNumber={1} 
+                  onUploadComplete={handleTrackUpload} 
+                />
               </CardContent>
             </Card>
             
@@ -227,7 +229,9 @@ export const MultiTrackMixer: React.FC = () => {
         <TabsContent value="effects" className="space-y-6">
           <AudioEffectsPanel 
             tracks={tracks}
-            onUpdateEffect={updateTrackEffect}
+            onUpdateEffect={(trackId, effectType, settings) => 
+              updateTrackEffect(trackId, effectType, settings)
+            }
           />
         </TabsContent>
         
@@ -274,7 +278,6 @@ export const MultiTrackMixer: React.FC = () => {
                 </div>
                 
                 <div>
-                  {/* Fixed the button to use a proper download link */}
                   <a 
                     href={mixedTrackUrl} 
                     download="mixify-multi-track.mp3"

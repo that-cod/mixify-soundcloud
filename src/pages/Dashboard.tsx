@@ -5,8 +5,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { History, Music, Settings, Mix3, Waveform } from 'lucide-react';
+import { History, Music, Settings, Waveform as WaveformIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+// Import a custom Mix3 icon since it's not in the standard Lucide library
+const Mix3 = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M2 4h20M2 9h12M2 14h12M2 19h12M16 19h3a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-3v9z" />
+  </svg>
+);
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -51,7 +69,7 @@ const Dashboard: React.FC = () => {
                 variant="outline"
                 onClick={() => navigate('/multi-track-mixer')}
               >
-                <Waveform className="mr-2 h-4 w-4" />
+                <WaveformIcon className="mr-2 h-4 w-4" />
                 Advanced Studio
               </Button>
             </CardContent>
