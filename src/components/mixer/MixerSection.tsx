@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -116,8 +115,12 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
 
   // Staged mixing completed handler
   const handleStagedMixComplete = (mixedUrl: string) => {
-    // Handle completion of the staged mixing process
-    onMixedWavesurferReady(new WaveSurfer({})); // This is a placeholder, in a real implementation this would be the actual wavesurfer instance
+    // Instead of creating an empty WaveSurfer instance, we should simply call the callback
+    // to notify that the mixed track is ready. The actual WaveSurfer instance will be
+    // created when the WaveformDisplay component renders with the new URL.
+    if (mixedUrl) {
+      onMixedWavesurferReady(null as any); // Pass null for now, the actual instance will be created by WaveformDisplay
+    }
   };
 
   if (mixedTrackUrl) {
