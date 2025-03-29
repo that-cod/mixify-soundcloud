@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
@@ -99,7 +100,7 @@ export const usePromptProcessing = ({
     } catch (error) {
       console.error("Error processing prompt:", error);
       
-      // Try fallback to the old Claude API directly
+      // Try fallback to the direct AI API
       try {
         return await fallbackPromptProcessing(prompt);
       } catch (fallbackError) {
@@ -122,20 +123,62 @@ export const usePromptProcessing = ({
   const fallbackPromptProcessing = async (prompt: string) => {
     console.log("Using fallback prompt processing method");
     
-    // The API key is now hardcoded for hackathon use
-    const ANTHROPIC_API_KEY = "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";
+    // The API keys for direct fallback (first Claude, then OpenAI if Claude fails)
+    const CLAUDE_API_KEY = "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";
+    const OPENAI_API_KEY = "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";
     
-    // Import the old analysis function
-    const { analyzePromptWithClaude } = await import('@/services/anthropic-service');
-    
-    // Process the prompt with Claude API
-    const analysisResult = await analyzePromptWithClaude(
-      prompt, 
-      track1Features, 
-      track2Features,
-      ANTHROPIC_API_KEY
-    );
-    
+    try {
+      // First try with Claude
+      console.log("Attempting direct Claude API call...");
+      const { analyzePromptWithClaude } = await import('@/services/anthropic-service');
+      
+      // Process the prompt with Claude API
+      const analysisResult = await analyzePromptWithClaude(
+        prompt, 
+        track1Features, 
+        track2Features,
+        CLAUDE_API_KEY
+      );
+      
+      // If successful, use the Claude results
+      console.log("Claude API direct call succeeded");
+      return processAnalysisResult(analysisResult, "Claude");
+      
+    } catch (claudeError) {
+      // If Claude fails and OpenAI key is available, try OpenAI
+      console.error("Claude API direct call failed:", claudeError);
+      
+      if (OPENAI_API_KEY) {
+        console.log("Falling back to OpenAI API...");
+        try {
+          // Import the OpenAI processor
+          const { analyzePromptWithOpenAI } = await import('@/services/openai-service');
+          
+          // Process with OpenAI
+          const openaiResult = await analyzePromptWithOpenAI(
+            prompt,
+            track1Features,
+            track2Features,
+            OPENAI_API_KEY
+          );
+          
+          // If successful, use the OpenAI results
+          console.log("OpenAI API fallback succeeded");
+          return processAnalysisResult(openaiResult, "OpenAI");
+          
+        } catch (openaiError) {
+          console.error("OpenAI API fallback failed:", openaiError);
+          throw new Error("Both Claude and OpenAI direct API calls failed");
+        }
+      } else {
+        // No OpenAI key, rethrow Claude error
+        throw claudeError;
+      }
+    }
+  };
+  
+  // Helper to process analysis results from any AI service
+  const processAnalysisResult = (analysisResult: PromptAnalysisResult, source: string) => {
     // Save the analysis result
     setPromptAnalysisResult(analysisResult);
     
@@ -149,8 +192,8 @@ export const usePromptProcessing = ({
     
     // Display the results to the user
     toast({
-      title: "Analysis Complete (Fallback Mode)",
-      description: analysisResult.summary || "AI has determined the optimal mix settings based on your prompt!",
+      title: `Analysis Complete (${source} Fallback Mode)`,
+      description: analysisResult.summary || `AI has determined the optimal mix settings based on your prompt! (processed by ${source})`,
     });
     
     setIsProcessingPrompt(false);

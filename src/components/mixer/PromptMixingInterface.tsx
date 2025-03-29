@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
   promptAnalysisResult,
   onPromptSubmit,
   onApplyAndMix,
-  hasApiKey = true, // Default to true since we have hardcoded API key
+  hasApiKey = true, // Default to true since we have hardcoded API keys
 }) => {
   const [prompt, setPrompt] = useState("");
   const [showExamples, setShowExamples] = useState(false);
@@ -58,6 +59,9 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
     }
   };
 
+  // Determine if OpenAI was used (via the summary text)
+  const wasProcessedByOpenAI = promptAnalysisResult?.summary?.includes('OpenAI') || false;
+
   // Render the analysis result in a readable format
   const renderAnalysisResult = () => {
     if (!promptAnalysisResult) return null;
@@ -67,7 +71,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
         <div className="rounded-md bg-mixify-purple/10 border border-mixify-purple/30 p-3">
           <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-mixify-purple-light" />
-            AI Mix Plan
+            AI Mix Plan {wasProcessedByOpenAI ? "(OpenAI)" : "(Claude)"}
           </h4>
           <p className="text-sm">{promptAnalysisResult.summary}</p>
           
@@ -117,7 +121,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
             <div>
               <p className="text-sm text-green-400">Hackathon Edition</p>
               <p className="text-xs text-green-300/80 mt-1">
-                Anthropic Claude API is integrated and ready to use for this hackathon project!
+                Both Anthropic Claude and OpenAI APIs are integrated and ready to use. We'll use OpenAI as fallback if Claude fails.
               </p>
             </div>
           </div>

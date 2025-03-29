@@ -1,12 +1,17 @@
-
-const { Configuration, OpenAIApi } = require('openai');
+const { OpenAI } = require('openai');
 const dotenv = require('dotenv');
 
 // Load environment variables
 dotenv.config();
 
-// Initialize Claude client (using your hardcoded key for now)
+// Initialize Claude client key
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || "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";
+
+// Initialize OpenAI client for fallback
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const openai = new OpenAI({
+  apiKey: OPENAI_API_KEY
+});
 
 /**
  * Analyze a mixing prompt using AI (Claude or OpenAI)
@@ -20,10 +25,30 @@ async function analyzePrompt(prompt, track1Features, track2Features) {
     // Create system prompt
     const systemPrompt = createSystemPrompt(track1Features, track2Features);
     
-    // Use Claude API for analysis
-    const analysisResult = await analyzeWithClaude(systemPrompt, prompt);
-    
-    return analysisResult;
+    // First try to use Claude API for analysis
+    try {
+      console.log('Attempting to use Claude API for analysis...');
+      const analysisResult = await analyzeWithClaude(systemPrompt, prompt);
+      return analysisResult;
+    } catch (claudeError) {
+      console.error('Claude API error:', claudeError);
+      console.log('Claude API failed, falling back to OpenAI...');
+      
+      // If Claude fails and OpenAI key is available, use OpenAI as fallback
+      if (OPENAI_API_KEY) {
+        try {
+          console.log('Attempting to use OpenAI for analysis...');
+          const openaiResult = await analyzeWithOpenAI(systemPrompt, prompt);
+          return openaiResult;
+        } catch (openaiError) {
+          console.error('OpenAI fallback failed:', openaiError);
+          throw new Error('Both Claude and OpenAI analysis failed');
+        }
+      } else {
+        // No OpenAI key available, so rethrow the Claude error
+        throw claudeError;
+      }
+    }
   } catch (error) {
     console.error('Prompt analysis error:', error);
     
@@ -33,7 +58,7 @@ async function analyzePrompt(prompt, track1Features, track2Features) {
       console.error('Error response status:', error.response.status);
     }
     
-    // Fallback to default analysis if AI analysis fails
+    // Fallback to default analysis if all AI analysis attempts fail
     return createDefaultAnalysis(track1Features, track2Features);
   }
 }
@@ -193,6 +218,95 @@ async function analyzeWithClaude(systemPrompt, userPrompt) {
       throw new Error(`Authentication error: ${error.message}. Please check your API key.`);
     } else if (error.message.includes('429')) {
       throw new Error('Rate limit exceeded. Please try again in a few minutes.');
+    } else {
+      throw error; // Propagate the detailed error
+    }
+  }
+}
+
+/**
+ * Analyze prompt using OpenAI API as fallback
+ * @param {string} systemPrompt System prompt
+ * @param {string} userPrompt User prompt
+ * @returns {Promise<Object>} Analysis result
+ */
+async function analyzeWithOpenAI(systemPrompt, userPrompt) {
+  try {
+    console.log('Sending request to OpenAI API...');
+    
+    // Format the messages for OpenAI
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      {
+        role: 'user',
+        content: userPrompt
+      }
+    ];
+    
+    // Call OpenAI API
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: messages,
+      temperature: 0.2,
+      max_tokens: 4000
+    });
+    
+    // Check if we have a valid response
+    if (!response || !response.choices || !response.choices[0] || !response.choices[0].message) {
+      console.error('Invalid OpenAI API response structure:', JSON.stringify(response));
+      throw new Error('OpenAI API returned an invalid response structure');
+    }
+    
+    // Extract content text
+    const content = response.choices[0].message.content;
+    console.log('OpenAI response content:', content.substring(0, 100) + '...');
+    
+    // Look for a valid JSON object in the response text
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('No JSON object found in OpenAI response:', content);
+      throw new Error('No JSON object found in OpenAI response');
+    }
+    
+    const jsonContent = jsonMatch[0];
+    
+    // Parse the JSON
+    try {
+      const parsedResult = JSON.parse(jsonContent);
+      
+      // Validate the result structure
+      if (!parsedResult.instructions || !Array.isArray(parsedResult.instructions)) {
+        console.error('Missing or invalid instructions in parsed result:', parsedResult);
+        throw new Error('Missing or invalid instructions array in parsed result');
+      }
+      
+      if (!parsedResult.recommendedSettings) {
+        console.error('Missing recommendedSettings in parsed result:', parsedResult);
+        throw new Error('Missing recommendedSettings in parsed result');
+      }
+      
+      // Add a default summary if missing
+      if (!parsedResult.summary) {
+        parsedResult.summary = "AI-generated mix based on your instructions (processed by OpenAI).";
+      }
+      
+      return parsedResult;
+    } catch (jsonError) {
+      console.error('Error parsing JSON from OpenAI response:', jsonError);
+      console.error('JSON content that failed to parse:', jsonContent);
+      throw new Error(`Failed to parse JSON from OpenAI response: ${jsonError.message}`);
+    }
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    
+    // Add more context to the error
+    if (error.message.includes('API key')) {
+      throw new Error(`OpenAI authentication error: ${error.message}. Please check your API key.`);
+    } else if (error.message.includes('429')) {
+      throw new Error('OpenAI rate limit exceeded. Please try again in a few minutes.');
     } else {
       throw error; // Propagate the detailed error
     }
