@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Music2, X, Loader2, AlertCircle } from 'lucide-react';
@@ -62,7 +61,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
           toast({
             title: "Storage Warning",
             description: "The storage bucket is not set to public. Your uploaded files might not be accessible.",
-            variant: "warning",
+            variant: "warning", // Now we can use the warning variant we added
           });
         } else {
           console.log(`AudioUploader ${trackNumber}: Bucket "${STORAGE_BUCKET}" is ready for use`);
