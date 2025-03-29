@@ -112,7 +112,8 @@ export const analyzePromptWithClaude = async (
   apiKey: string
 ): Promise<PromptAnalysisResult> => {
   try {
-    if (!apiKey) {
+    // Validate API key
+    if (!apiKey || apiKey.trim() === '') {
       throw new Error("API key is required");
     }
 
@@ -150,24 +151,74 @@ export const analyzePromptWithClaude = async (
     if (!response.ok) {
       const errorData = await response.text();
       console.error("Claude API error:", errorData);
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      
+      // Check for specific error types
+      if (response.status === 401) {
+        throw new Error("Invalid API key. Please check your Anthropic API key and try again.");
+      } else if (response.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again in a few minutes.");
+      } else {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
     }
 
     const data = await response.json() as AnthropicResponse;
-    console.log("Claude API response:", data);
+    console.log("Claude API response received");
 
     // Extract the JSON response from Claude's text
     if (!data.content || data.content.length === 0 || !data.content[0].text) {
-      throw new Error("Invalid response from Claude API");
+      throw new Error("Invalid response format from Claude API");
     }
 
-    const jsonText = data.content[0].text.trim();
-    const result = JSON.parse(jsonText) as PromptAnalysisResult;
-    
-    console.log("Parsed result:", result);
-    return result;
+    // Safe parsing with error handling for malformed JSON
+    try {
+      const jsonText = data.content[0].text.trim();
+      // Try to find and extract a JSON object if there's additional text
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+      const cleanedJsonText = jsonMatch ? jsonMatch[0] : jsonText;
+      
+      const result = JSON.parse(cleanedJsonText) as PromptAnalysisResult;
+      
+      // Validate the result structure
+      if (!result.instructions || !result.recommendedSettings) {
+        throw new Error("Incomplete response structure from Claude API");
+      }
+      
+      // Ensure all required fields in recommendedSettings have values
+      const defaultSettings = {
+        bpmMatch: true,
+        keyMatch: true,
+        vocalLevel1: 0.8,
+        vocalLevel2: 0.5,
+        beatLevel1: 0.6,
+        beatLevel2: 0.8,
+        crossfadeLength: 8,
+        echo: 0.2,
+        tempo: 0
+      };
+      
+      // Merge with defaults for any missing fields
+      result.recommendedSettings = {
+        ...defaultSettings,
+        ...result.recommendedSettings
+      };
+      
+      console.log("Parsed result successfully");
+      return result;
+    } catch (parseError) {
+      console.error("Error parsing Claude response as JSON:", parseError);
+      console.error("Raw response:", data.content[0].text);
+      throw new Error("Failed to parse Claude API response as JSON");
+    }
   } catch (error) {
     console.error("Error analyzing prompt with Claude:", error);
+    // Show error toast with specific message
+    toast({
+      title: "AI Processing Error",
+      description: error instanceof Error ? error.message : "An unexpected error occurred processing your instructions",
+      variant: "destructive",
+    });
+    
     // Return default settings in case of error
     return {
       instructions: [
@@ -192,3 +243,4 @@ export const analyzePromptWithClaude = async (
     };
   }
 };
+
