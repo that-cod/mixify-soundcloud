@@ -31,9 +31,12 @@ const Mixer: React.FC = () => {
     track2Features,
     isAnalyzing,
     analyzeProgress,
+    isProcessingPrompt,
+    promptProcessProgress,
     mixSettings,
     updateMixSetting,
     handleMix,
+    handlePromptMix,
     togglePlayback,
     restartPlayback,
     handleTrack1WavesurferReady,
@@ -104,6 +107,8 @@ const Mixer: React.FC = () => {
           <MixerSection
             track1Url={track1Url}
             track2Url={track2Url}
+            track1Name={track1Name}
+            track2Name={track2Name}
             mixedTrackUrl={mixedTrackUrl}
             isMixing={isMixing}
             mixProgress={mixProgress}
@@ -118,6 +123,9 @@ const Mixer: React.FC = () => {
             togglePlayback={togglePlayback}
             restartPlayback={restartPlayback}
             onMixedWavesurferReady={handleMixedWavesurferReady}
+            isProcessingPrompt={isProcessingPrompt}
+            promptProcessProgress={promptProcessProgress}
+            handlePromptMix={handlePromptMix}
           />
         </div>
       </div>
