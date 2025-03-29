@@ -1,19 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { WaveformDisplay } from './WaveformDisplay';
 import { AudioUploader } from './AudioUploader';
 import { TrackAnalysis } from './TrackAnalysis';
 import { Badge } from '@/components/ui/badge';
 import WaveSurfer from 'wavesurfer.js';
 import { Database, HardDrive } from 'lucide-react';
-
-interface AudioFeatures {
-  bpm: number;
-  key: string;
-  energy: number;
-  clarity: number;
-  cached?: boolean;
-}
+import { AudioFeatures } from '@/types/audio';
 
 interface TrackSectionProps {
   trackNumber: 1 | 2;
