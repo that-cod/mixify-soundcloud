@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { analyzePromptWithClaude, PromptAnalysisResult } from '@/services/anthropic-service';
@@ -30,6 +29,9 @@ export const usePromptProcessing = ({
   
   const { toast } = useToast();
 
+  // The API key is now hardcoded for hackathon use
+  const ANTHROPIC_API_KEY = "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";
+
   // Function to handle AI prompt-based mixing
   const handlePromptMix = async (prompt: string) => {
     if (!track1Features || !track2Features) {
@@ -50,12 +52,7 @@ export const usePromptProcessing = ({
     });
 
     try {
-      // Get API key from localStorage
-      const apiKey = localStorage.getItem('anthropic_api_key');
-      
-      if (!apiKey) {
-        throw new Error("API key is required");
-      }
+      // Use the hardcoded API key instead of getting it from localStorage
       
       // Progress simulation
       let progress = 0;
@@ -71,7 +68,7 @@ export const usePromptProcessing = ({
         prompt, 
         track1Features, 
         track2Features,
-        apiKey
+        ANTHROPIC_API_KEY
       );
       
       clearInterval(progressInterval);

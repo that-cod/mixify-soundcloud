@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Lightbulb, PenTool, AlertCircle, Check, CheckCircle2 } from 'lucide-react';
-import { PromptAnalysisResult, MixingInstruction } from '@/services/anthropic-service';
+import { Loader2, Lightbulb, PenTool, Check, CheckCircle2, Info } from 'lucide-react';
+import { PromptAnalysisResult } from '@/services/anthropic-service';
 
 interface AudioFeatures {
   bpm: number;
@@ -36,7 +35,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
   promptAnalysisResult,
   onPromptSubmit,
   onApplyAndMix,
-  hasApiKey = false,
+  hasApiKey = true, // Default to true since we have hardcoded API key
 }) => {
   const [prompt, setPrompt] = useState("");
   const [showExamples, setShowExamples] = useState(false);
@@ -111,6 +110,19 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Add message about API key for hackathon */}
+        <div className="rounded-md bg-green-500/10 border border-green-500/30 p-3 mb-4">
+          <div className="flex items-start">
+            <Info className="h-5 w-5 text-green-400 mr-2 mt-0.5" />
+            <div>
+              <p className="text-sm text-green-400">Hackathon Edition</p>
+              <p className="text-xs text-green-300/80 mt-1">
+                Anthropic Claude API is integrated and ready to use for this hackathon project!
+              </p>
+            </div>
+          </div>
+        </div>
+
         {isProcessing ? (
           <div className="flex flex-col items-center py-4">
             <Loader2 className="h-8 w-8 text-mixify-purple-light animate-spin mb-4" />
@@ -125,20 +137,6 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
           </div>
         ) : (
           <>
-            {!hasApiKey && (
-              <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-3 mb-4">
-                <div className="flex items-start">
-                  <AlertCircle className="h-5 w-5 text-amber-400 mr-2 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-amber-400">API Key Required</p>
-                    <p className="text-xs text-amber-300/80 mt-1">
-                      Please enter your Anthropic API key above to use AI-powered mixing.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Analysis result display */}
             {promptAnalysisResult && renderAnalysisResult()}
 
@@ -192,7 +190,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
                   </Button>
                   <Button 
                     onClick={handleSubmit} 
-                    disabled={!prompt.trim() || !track1Features || !track2Features || !hasApiKey}
+                    disabled={!prompt.trim() || !track1Features || !track2Features}
                     className="bg-mixify-purple hover:bg-mixify-purple-dark"
                   >
                     Generate Mix
