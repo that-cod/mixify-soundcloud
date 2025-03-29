@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AudioWaveform, Music3, Clock, Waveform } from 'lucide-react';
+import { AudioWaveform, Music3, Clock } from 'lucide-react';
 
 interface AudioFeatures {
   bpm: number;

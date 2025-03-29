@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
@@ -8,7 +7,7 @@ import {
   Music2, 
   Settings2, 
   Music4, 
-  Waveform,
+  AudioWaveform,
   Volume2,
   RefreshCw,
   Mic2
@@ -135,7 +134,7 @@ export const MixSettings: React.FC<MixSettingsProps> = ({
           {/* Beats Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-white/90 flex items-center gap-2">
-              <Waveform className="h-3.5 w-3.5" />
+              <AudioWaveform className="h-3.5 w-3.5" />
               Beats
             </h3>
             
