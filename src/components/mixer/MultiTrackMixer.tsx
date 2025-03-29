@@ -180,6 +180,11 @@ export const MultiTrackMixer: React.FC = () => {
     );
   };
   
+  // Handle effect updates - this function adapts the component interface to our hook interface
+  const handleUpdateEffect = (trackId: string, effectType: keyof AudioFeatures["effects"], settings: any) => {
+    updateTrackEffect(trackId, effectType, settings);
+  };
+  
   return (
     <div className="mx-auto max-w-7xl">
       <Tabs defaultValue="tracks" value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
@@ -196,7 +201,7 @@ export const MultiTrackMixer: React.FC = () => {
             <Card className="glass-card border-dashed border-white/20 hover:border-white/40 transition-all">
               <CardContent className="flex flex-col items-center justify-center p-6 h-48">
                 <AudioUploader 
-                  trackNumber={1} 
+                  trackNumber={1}
                   onUploadComplete={handleTrackUpload} 
                 />
               </CardContent>
@@ -229,9 +234,7 @@ export const MultiTrackMixer: React.FC = () => {
         <TabsContent value="effects" className="space-y-6">
           <AudioEffectsPanel 
             tracks={tracks}
-            onUpdateEffect={(trackId, effectType, settings) => 
-              updateTrackEffect(trackId, effectType, settings)
-            }
+            onUpdateEffect={handleUpdateEffect}
           />
         </TabsContent>
         
@@ -278,14 +281,19 @@ export const MultiTrackMixer: React.FC = () => {
                 </div>
                 
                 <div>
-                  <a 
-                    href={mixedTrackUrl} 
-                    download="mixify-multi-track.mp3"
-                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                  <Button
+                    variant="default"
+                    asChild
                   >
-                    <Download className="h-4 w-4" />
-                    Download Mix
-                  </a>
+                    <a 
+                      href={mixedTrackUrl} 
+                      download="mixify-multi-track.mp3"
+                      className="inline-flex items-center justify-center gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download Mix
+                    </a>
+                  </Button>
                 </div>
               </div>
             </div>

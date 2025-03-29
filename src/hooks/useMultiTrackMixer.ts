@@ -292,14 +292,19 @@ export function useMultiTrackMixer() {
   
   const restartPlayback = () => {
     // Restart playback logic
+    setIsPlaying(false);
+    setTimeout(() => {
+      setIsPlaying(true);
+    }, 100);
   };
   
-  const setMasterVolume = (volume: number) => {
+  const updateMasterVolume = (volume: number) => {
     setMasterVolume(volume);
   };
   
   const handleWavesurferReady = (wavesurfer: any) => {
     // Handle wavesurfer ready
+    console.log("Wavesurfer ready", wavesurfer);
   };
   
   return {
@@ -324,7 +329,7 @@ export function useMultiTrackMixer() {
     startMixing,
     togglePlayback,
     restartPlayback,
-    setMasterVolume,
+    setMasterVolume: updateMasterVolume,
     handleWavesurferReady
   };
 }

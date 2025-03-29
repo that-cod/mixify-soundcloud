@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { History, Music, Settings, Waveform as WaveformIcon } from 'lucide-react';
+import { History, Music, Settings, AudioWaveform } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Import a custom Mix3 icon since it's not in the standard Lucide library
@@ -69,7 +68,7 @@ const Dashboard: React.FC = () => {
                 variant="outline"
                 onClick={() => navigate('/multi-track-mixer')}
               >
-                <WaveformIcon className="mr-2 h-4 w-4" />
+                <AudioWaveform className="mr-2 h-4 w-4" />
                 Advanced Studio
               </Button>
             </CardContent>
