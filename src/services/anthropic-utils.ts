@@ -1,122 +1,226 @@
 
-import { toast } from "@/hooks/use-toast";
-import { PromptAnalysisResult, DEFAULT_MIX_SETTINGS, AnthropicResponse } from './anthropic-types';
+import { MixSettingsType } from '@/types/mixer';
+import { PromptAnalysisResult, AnthropicResponse, DEFAULT_MIX_SETTINGS } from './anthropic-types';
 
 /**
- * Safely parses the JSON response from Claude
+ * Validate API key format
  */
-export const parseClaudeResponse = (data: AnthropicResponse): PromptAnalysisResult => {
-  try {
-    // Validate response structure
-    if (!data.content || data.content.length === 0 || !data.content[0].text) {
-      throw new Error("Invalid response format from Claude API");
-    }
-
-    const jsonText = data.content[0].text.trim();
-    console.log("Raw Claude response:", jsonText.length > 200 ? jsonText.substring(0, 200) + '...' : jsonText);
-    
-    // Try to find and extract a JSON object if there's additional text
-    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No valid JSON object found in Claude response");
-    }
-    
-    const cleanedJsonText = jsonMatch[0];
-    console.log("Extracted JSON:", cleanedJsonText.length > 200 ? cleanedJsonText.substring(0, 200) + '...' : cleanedJsonText);
-    
-    let result: PromptAnalysisResult;
-    try {
-      result = JSON.parse(cleanedJsonText) as PromptAnalysisResult;
-    } catch (jsonError) {
-      console.error("JSON parse error:", jsonError);
-      throw new Error(`Failed to parse Claude response as JSON: ${(jsonError as Error).message}`);
-    }
-    
-    // Validate the result structure
-    if (!result.instructions || !Array.isArray(result.instructions)) {
-      throw new Error("Missing or invalid instructions in Claude response");
-    }
-    
-    if (!result.recommendedSettings) {
-      throw new Error("Missing recommendedSettings in Claude response");
-    }
-    
-    // Merge with defaults for any missing fields
-    result.recommendedSettings = {
-      ...DEFAULT_MIX_SETTINGS,
-      ...result.recommendedSettings
-    };
-    
-    // Add default summary if missing
-    if (!result.summary) {
-      result.summary = "AI-generated mix based on your instructions.";
-    }
-    
-    console.log("Parsed result successfully");
-    return result;
-  } catch (parseError) {
-    console.error("Error parsing Claude response:", parseError);
-    console.error("Raw response:", data.content?.[0]?.text);
-    throw new Error(`Failed to parse Claude API response: ${(parseError as Error).message}`);
-  }
-};
-
-/**
- * Handles API errors and shows appropriate toast messages
- */
-export const handleApiError = (error: unknown): PromptAnalysisResult => {
-  const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-  console.error("Error analyzing prompt with Claude:", error);
-  
-  // Categorize error for better user feedback
-  let toastTitle = "AI Processing Error";
-  let toastDescription = errorMessage;
-  
-  if (errorMessage.includes("API key") || errorMessage.includes("Authentication")) {
-    toastTitle = "API Key Error";
-    toastDescription = "There was a problem with the Claude API key. Please check your key and try again.";
-  } else if (errorMessage.includes("rate limit") || errorMessage.includes("429")) {
-    toastTitle = "Rate Limit Exceeded";
-    toastDescription = "The Claude API rate limit has been reached. Please try again in a few minutes.";
-  } else if (errorMessage.includes("parse") || errorMessage.includes("JSON")) {
-    toastTitle = "Response Processing Error";
-    toastDescription = "Could not process the AI response format. Using default settings instead.";
-  }
-  
-  // Show error toast with specific message
-  toast({
-    title: toastTitle,
-    description: toastDescription,
-    variant: "destructive",
-  });
-  
-  // Return default settings in case of error
-  return {
-    instructions: [
-      {
-        type: 'general',
-        description: 'Error processing prompt. Using default settings.',
-        confidence: 1,
-        value: 'error'
-      }
-    ],
-    summary: "Error processing your mixing instructions. Using default settings.",
-    recommendedSettings: DEFAULT_MIX_SETTINGS
-  };
-};
-
-/**
- * Validates the API key
- */
-export const validateApiKey = (apiKey: string | null): string => {
-  if (!apiKey || apiKey.trim() === '') {
+export function validateApiKey(apiKey: string): string {
+  if (!apiKey) {
     throw new Error("API key is required");
   }
   
-  // Basic format validation for Claude API keys
-  if (!apiKey.startsWith('sk-')) {
-    throw new Error("Invalid API key format. Claude API keys should start with 'sk-'");
+  // Basic validation for Anthropic API key format
+  if (!apiKey.trim().startsWith('sk-')) {
+    throw new Error("Invalid API key format. Anthropic API keys should start with 'sk-'");
   }
   
-  return apiKey;
-};
+  return apiKey.trim();
+}
+
+/**
+ * Parse response from Claude API
+ */
+export function parseClaudeResponse(data: AnthropicResponse): PromptAnalysisResult {
+  try {
+    // Extract the text content from the response
+    const responseText = data.content?.[0]?.text || '';
+    
+    // Try to find a JSON block in the response
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || 
+                     responseText.match(/```\n([\s\S]*?)\n```/) ||
+                     responseText.match(/{[\s\S]*?}/);
+    
+    let parsedData: Partial<PromptAnalysisResult> = {};
+    
+    if (jsonMatch) {
+      try {
+        // Extract the JSON content
+        const jsonContent = jsonMatch[1] || jsonMatch[0];
+        parsedData = JSON.parse(jsonContent);
+      } catch (jsonError) {
+        console.error("Failed to parse JSON from Claude response:", jsonError);
+      }
+    }
+    
+    // If no JSON was found or it was invalid, try to extract structured data from the text
+    if (!parsedData.instructions || !parsedData.recommendedSettings) {
+      // Extract instructions from text
+      const instructions = extractInstructionsFromText(responseText);
+      
+      // Extract recommended settings
+      const recommendedSettings = extractSettingsFromText(responseText) || DEFAULT_MIX_SETTINGS;
+      
+      // Create a summary
+      const summary = extractSummaryFromText(responseText) || "Generated mix based on your instructions";
+      
+      parsedData = {
+        instructions,
+        recommendedSettings,
+        summary
+      };
+    }
+    
+    // Ensure the result has all required fields
+    return {
+      instructions: parsedData.instructions || [],
+      recommendedSettings: parsedData.recommendedSettings || DEFAULT_MIX_SETTINGS,
+      summary: parsedData.summary || "Generated mix based on your instructions"
+    };
+    
+  } catch (error) {
+    console.error("Error parsing Claude response:", error);
+    return {
+      instructions: [],
+      recommendedSettings: DEFAULT_MIX_SETTINGS,
+      summary: "Failed to parse AI response"
+    };
+  }
+}
+
+/**
+ * Handle API errors
+ */
+export function handleApiError(error: any): PromptAnalysisResult {
+  const errorMessage = error.message || "Unknown error";
+  console.error("API error:", errorMessage);
+  
+  return {
+    instructions: [],
+    recommendedSettings: DEFAULT_MIX_SETTINGS,
+    summary: `Error: ${errorMessage}`
+  };
+}
+
+/**
+ * Extract mixing instructions from text
+ */
+function extractInstructionsFromText(text: string) {
+  const instructions = [];
+  
+  // Extract BPM matching instructions
+  if (text.includes('match BPM') || text.includes('sync tempo') || text.includes('tempo matching')) {
+    instructions.push({
+      type: 'bpmMatch',
+      description: 'Match BPM between tracks',
+      value: true,
+      confidence: 0.9
+    });
+  }
+  
+  // Extract vocal level instructions
+  const vocalMatch = text.match(/(?:vocals?|singing) (?:level|volume).*?(\d+)%/i);
+  if (vocalMatch) {
+    const vocalLevel = parseInt(vocalMatch[1]) / 100;
+    instructions.push({
+      type: 'vocalLevel',
+      description: 'Adjust vocal levels',
+      value: vocalLevel,
+      confidence: 0.8
+    });
+  }
+  
+  // Extract beat level instructions
+  const beatMatch = text.match(/(?:beat|drums?) (?:level|volume).*?(\d+)%/i);
+  if (beatMatch) {
+    const beatLevel = parseInt(beatMatch[1]) / 100;
+    instructions.push({
+      type: 'beatLevel',
+      description: 'Adjust beat levels',
+      value: beatLevel,
+      confidence: 0.8
+    });
+  }
+  
+  // Extract echo/reverb instructions
+  if (text.includes('echo') || text.includes('reverb')) {
+    const echoMatch = text.match(/(?:echo|reverb).*?(\d+)%/i);
+    const echoLevel = echoMatch ? parseInt(echoMatch[1]) / 100 : 0.3;
+    
+    instructions.push({
+      type: 'echo',
+      description: 'Add echo/reverb effect',
+      value: echoLevel,
+      confidence: 0.7
+    });
+  }
+  
+  // Add a default instruction if none were extracted
+  if (instructions.length === 0) {
+    instructions.push({
+      type: 'standard',
+      description: 'Create a balanced mix',
+      value: true,
+      confidence: 0.5
+    });
+  }
+  
+  return instructions;
+}
+
+/**
+ * Extract recommended settings from text
+ */
+function extractSettingsFromText(text: string): MixSettingsType | null {
+  // Default settings
+  const settings: MixSettingsType = { ...DEFAULT_MIX_SETTINGS };
+  
+  // Detect if BPM matching is mentioned
+  if (text.includes('match BPM') || text.includes('sync tempo')) {
+    settings.bpmMatch = true;
+  } else if (text.includes('don\'t match BPM') || text.includes('keep original tempo')) {
+    settings.bpmMatch = false;
+  }
+  
+  // Extract vocal levels
+  const vocalMatch = text.match(/(?:vocals?|singing).*?(\d+)%/i);
+  if (vocalMatch) {
+    const vocalLevel = parseInt(vocalMatch[1]) / 100;
+    settings.vocalLevel1 = vocalLevel;
+    settings.vocalLevel2 = vocalLevel;
+  }
+  
+  // Extract beat levels
+  const beatMatch = text.match(/(?:beat|drums?).*?(\d+)%/i);
+  if (beatMatch) {
+    const beatLevel = parseInt(beatMatch[1]) / 100;
+    settings.beatLevel1 = beatLevel;
+    settings.beatLevel2 = beatLevel;
+  }
+  
+  // Extract crossfade length
+  const crossfadeMatch = text.match(/(?:crossfade|transition).*?(\d+)\s*(?:sec|seconds)/i);
+  if (crossfadeMatch) {
+    const crossfade = parseInt(crossfadeMatch[1]);
+    settings.crossfadeLength = Math.min(16, Math.max(1, crossfade));
+  }
+  
+  // Extract echo amount
+  const echoMatch = text.match(/(?:echo|reverb).*?(\d+)%/i);
+  if (echoMatch) {
+    settings.echo = parseInt(echoMatch[1]) / 100;
+  }
+  
+  return settings;
+}
+
+/**
+ * Extract summary from text
+ */
+function extractSummaryFromText(text: string): string | null {
+  // Try to find a summary section
+  const summaryMatch = text.match(/(?:summary|overview|in summary)[:;]\s*(.*?)(?:\n|$)/i);
+  if (summaryMatch) {
+    return summaryMatch[1].trim();
+  }
+  
+  // If no explicit summary, take the first sentence that's not too long
+  const sentences = text.split(/[.!?]\s+/);
+  for (const sentence of sentences) {
+    if (sentence.length > 20 && sentence.length < 120) {
+      return sentence.trim() + '.';
+    }
+  }
+  
+  return null;
+}

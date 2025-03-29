@@ -1,16 +1,9 @@
 
-import { API_URL, MODEL, MAX_TOKENS, MixingInstruction } from './anthropic-types';
+import { API_URL, MODEL, MAX_TOKENS, MixingInstruction, PromptAnalysisResult } from './anthropic-types';
 import { MixSettingsType } from '@/types/mixer';
 import { AudioFeatures } from '@/types/audio';
 import { getSystemPrompt } from './anthropic-prompt';
 import { parseClaudeResponse, handleApiError, validateApiKey } from './anthropic-utils';
-
-// Type definition for prompt analysis results
-export interface PromptAnalysisResult {
-  instructions: MixingInstruction[];
-  summary: string;
-  recommendedSettings: MixSettingsType;
-}
 
 /**
  * Main function to analyze prompt using Claude API

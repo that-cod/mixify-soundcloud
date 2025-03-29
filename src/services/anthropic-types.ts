@@ -35,3 +35,39 @@ export interface PromptAnalysisResultType {
   summary: string;
   recommendedSettings: MixSettingsType;
 }
+
+// Re-export AudioFeatures
+export { AudioFeatures };
+
+// Define AnthropicResponse
+export interface AnthropicResponse {
+  id: string;
+  type: string;
+  role: string;
+  content: {
+    type: string;
+    text: string;
+  }[];
+  model: string;
+  stop_reason: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+// Add default mix settings
+export const DEFAULT_MIX_SETTINGS: MixSettingsType = {
+  bpmMatch: true,
+  keyMatch: true,
+  vocalLevel1: 0.8,
+  vocalLevel2: 0.8,
+  beatLevel1: 0.8,
+  beatLevel2: 0.8,
+  crossfadeLength: 8,
+  echo: 0.3,
+  tempo: 0
+};
+
+// Export PromptAnalysisResult
+export type PromptAnalysisResult = PromptAnalysisResultType;
