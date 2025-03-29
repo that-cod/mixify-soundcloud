@@ -1,13 +1,14 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, MicIcon, RefreshCw, Sparkles } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Loader2, MicIcon, RefreshCw, Sparkles, Lock, Key } from 'lucide-react';
 import { WaveformDisplay } from './WaveformDisplay';
 import { PlaybackControls } from './PlaybackControls';
 import { MixSettings } from './MixSettings';
 import { PromptMixingInterface } from './PromptMixingInterface';
 import WaveSurfer from 'wavesurfer.js';
+import { useToast } from '@/hooks/use-toast';
 
 interface AudioFeatures {
   bpm: number;
@@ -74,6 +75,36 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
   handlePromptMix,
 }) => {
   const [mixMode, setMixMode] = useState<'manual' | 'prompt'>('manual');
+  const [apiKey, setApiKey] = useState<string>(() => {
+    // Try to load from localStorage if available
+    const savedKey = localStorage.getItem('anthropic_api_key');
+    return savedKey || '';
+  });
+  const [showApiKey, setShowApiKey] = useState(false);
+  const { toast } = useToast();
+
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newKey = e.target.value;
+    setApiKey(newKey);
+    // Save to localStorage for persistence
+    localStorage.setItem('anthropic_api_key', newKey);
+  };
+
+  const handlePromptSubmit = (prompt: string) => {
+    if (!apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your Anthropic API key to use the AI mixing feature.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Pass the API key along with the prompt
+    handlePromptMix(prompt);
+  };
+
+  const getApiKey = () => apiKey;
 
   if (mixedTrackUrl) {
     return (
@@ -109,7 +140,46 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
   
   return (
     <div className="space-y-6">
-      {/* Mix Mode Selector */}
+      {/* API Key Input */}
+      {mixMode === 'prompt' && (
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Key className="h-4 w-4 text-mixify-accent" />
+              Anthropic API Key
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Required for AI-powered mixing analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="relative">
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  value={apiKey}
+                  onChange={handleApiKeyChange}
+                  placeholder="Enter your Anthropic API key"
+                  className="pr-10 bg-white/10 border-white/20"
+                />
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 text-white/50"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  <Lock className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-white/50">
+                Your API key is stored locally and never shared with our servers.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {(track1Url || track2Url) && (
         <div className="flex items-center justify-center space-x-4 mb-2">
           <Button
@@ -130,7 +200,6 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
         </div>
       )}
 
-      {/* Mix Settings for Manual Mode */}
       {mixMode === 'manual' && (track1Url || track2Url) && (
         <MixSettings 
           mixSettings={mixSettings}
@@ -140,7 +209,6 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
         />
       )}
 
-      {/* Prompt Interface for AI Mode */}
       {mixMode === 'prompt' && (track1Url || track2Url) && (
         <PromptMixingInterface
           isProcessing={isProcessingPrompt}
@@ -149,11 +217,11 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
           track2Features={track2Features}
           track1Name={track1Name}
           track2Name={track2Name}
-          onPromptSubmit={handlePromptMix}
+          onPromptSubmit={handlePromptSubmit}
+          hasApiKey={!!apiKey}
         />
       )}
     
-      {/* Create Mix Button */}
       {mixMode === 'manual' && (
         <Card className="glass-card">
           <CardHeader>

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Lightbulb, PenTool } from 'lucide-react';
+import { Loader2, Lightbulb, PenTool, AlertCircle } from 'lucide-react';
 
 interface AudioFeatures {
   bpm: number;
@@ -20,6 +20,7 @@ interface PromptMixingInterfaceProps {
   track1Name?: string;
   track2Name?: string;
   onPromptSubmit: (prompt: string) => void;
+  hasApiKey?: boolean;
 }
 
 export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
@@ -30,6 +31,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
   track1Name = "Track 1",
   track2Name = "Track 2",
   onPromptSubmit,
+  hasApiKey = false,
 }) => {
   const [prompt, setPrompt] = useState("");
   const [showExamples, setShowExamples] = useState(false);
@@ -78,6 +80,20 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
           </div>
         ) : (
           <>
+            {!hasApiKey && (
+              <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-3 mb-4">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-amber-400 mr-2 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-amber-400">API Key Required</p>
+                    <p className="text-xs text-amber-300/80 mt-1">
+                      Please enter your Anthropic API key above to use AI-powered mixing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-md bg-white/5 p-3 text-sm">
               <p className="mb-2 text-white/80">Available track information:</p>
               <div className="grid grid-cols-2 gap-4 text-xs">
@@ -126,7 +142,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
               </Button>
               <Button 
                 onClick={handleSubmit} 
-                disabled={!prompt.trim() || !track1Features || !track2Features}
+                disabled={!prompt.trim() || !track1Features || !track2Features || !hasApiKey}
                 className="bg-mixify-purple hover:bg-mixify-purple-dark"
               >
                 Generate Mix

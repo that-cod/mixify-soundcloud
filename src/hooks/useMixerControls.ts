@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import WaveSurfer from 'wavesurfer.js';
 import { analyzeAudio, separateTracks, matchBPM, harmonicMixing } from '@/utils/audioAnalysis';
+import { analyzePromptWithClaude, PromptAnalysisResult } from '@/services/anthropic-service';
 
 interface AudioFeatures {
   bpm: number;
@@ -44,6 +45,7 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
   // Prompt processing states
   const [isProcessingPrompt, setIsProcessingPrompt] = useState(false);
   const [promptProcessProgress, setPromptProcessProgress] = useState(0);
+  const [promptAnalysisResult, setPromptAnalysisResult] = useState<PromptAnalysisResult | null>(null);
   
   // Mix settings
   const [mixSettings, setMixSettings] = useState({
@@ -233,8 +235,8 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     }, 500);
   };
 
-  // New function to handle AI prompt-based mixing
-  const handlePromptMix = (prompt: string) => {
+  // Function to handle AI prompt-based mixing
+  const handlePromptMix = async (prompt: string) => {
     if (!track1Url || !track2Url) {
       toast({
         title: "Missing tracks",
@@ -260,123 +262,63 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
       title: "Processing your prompt",
       description: "Analyzing your instructions to create the perfect mix...",
     });
-    
-    // Simulate AI processing of the prompt
-    simulatePromptProcessing(prompt);
-  };
-  
-  const simulatePromptProcessing = (prompt: string) => {
-    let progress = 0;
-    const steps = [
-      "Interpreting your instructions...",
-      "Analyzing musical compatibility...",
-      "Determining optimal mix parameters...",
-      "Generating mixing plan...",
-    ];
-    
-    let currentStep = 0;
-    const interval = setInterval(() => {
-      progress += 5;
-      setPromptProcessProgress(progress);
+
+    try {
+      // Get API key from localStorage
+      const apiKey = localStorage.getItem('anthropic_api_key');
       
-      // Update toast with current step
-      if (progress % 25 === 0 && currentStep < steps.length) {
-        toast({
-          title: "AI Processing",
-          description: steps[currentStep],
-        });
-        currentStep++;
+      if (!apiKey) {
+        throw new Error("API key is required");
       }
       
-      if (progress >= 100) {
-        clearInterval(interval);
-        
-        // Parse the prompt to generate simulated AI-guided settings
-        const aiGeneratedSettings = generateAISettings(prompt);
-        
-        // Apply the AI-suggested settings
-        setMixSettings(aiGeneratedSettings);
-        
-        toast({
-          title: "Analysis Complete",
-          description: "AI has determined the optimal mix settings based on your prompt!",
-        });
-        
-        // Start the actual mixing process
-        setIsProcessingPrompt(false);
-        handleMix();
-      }
-    }, 300);
-  };
-  
-  // Simulate AI interpretation of user prompt to generate mix settings
-  const generateAISettings = (prompt: string) => {
-    console.log("Processing prompt:", prompt);
-    
-    // Default settings to start with
-    const newSettings = { ...mixSettings };
-    
-    // Very basic keyword matching to simulate AI understanding
-    const promptLower = prompt.toLowerCase();
-    
-    // BPM matching
-    if (promptLower.includes("match bpm") || promptLower.includes("same tempo")) {
-      newSettings.bpmMatch = true;
+      // Progress simulation
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 5;
+        if (progress <= 95) {
+          setPromptProcessProgress(progress);
+        }
+      }, 300);
+      
+      // Process the prompt with Claude API
+      const analysisResult = await analyzePromptWithClaude(
+        prompt, 
+        track1Features, 
+        track2Features,
+        apiKey
+      );
+      
+      clearInterval(progressInterval);
+      setPromptProcessProgress(100);
+      
+      // Save the analysis result
+      setPromptAnalysisResult(analysisResult);
+      
+      // Apply the AI-suggested settings
+      setMixSettings(analysisResult.recommendedSettings);
+      
+      // Display the results to the user
+      toast({
+        title: "Analysis Complete",
+        description: analysisResult.summary || "AI has determined the optimal mix settings based on your prompt!",
+      });
+      
+      // Start the actual mixing process
+      setIsProcessingPrompt(false);
+      handleMix();
+      
+    } catch (error) {
+      console.error("Error processing prompt:", error);
+      
+      toast({
+        title: "Prompt Processing Failed",
+        description: error instanceof Error ? error.message : "Failed to process your instructions. Please try again.",
+        variant: "destructive",
+      });
+      
+      setIsProcessingPrompt(false);
+      setPromptProcessProgress(0);
     }
-    
-    // Key matching
-    if (promptLower.includes("match key") || promptLower.includes("harmonic")) {
-      newSettings.keyMatch = true;
-    }
-    
-    // Vocals
-    if (promptLower.includes("vocal") || promptLower.includes("voice")) {
-      if (promptLower.includes("track 1") && promptLower.includes("high")) {
-        newSettings.vocalLevel1 = 0.9;
-        newSettings.vocalLevel2 = 0.4;
-      } else if (promptLower.includes("track 2") && promptLower.includes("high")) {
-        newSettings.vocalLevel1 = 0.4;
-        newSettings.vocalLevel2 = 0.9;
-      } else if (promptLower.includes("equal") || promptLower.includes("both")) {
-        newSettings.vocalLevel1 = 0.7;
-        newSettings.vocalLevel2 = 0.7;
-      }
-    }
-    
-    // Beats
-    if (promptLower.includes("beat") || promptLower.includes("drum")) {
-      if (promptLower.includes("track 1") && promptLower.includes("emphasize")) {
-        newSettings.beatLevel1 = 0.9;
-        newSettings.beatLevel2 = 0.5;
-      } else if (promptLower.includes("track 2") && promptLower.includes("emphasize")) {
-        newSettings.beatLevel1 = 0.5;
-        newSettings.beatLevel2 = 0.9;
-      }
-    }
-    
-    // Crossfade
-    if (promptLower.includes("long crossfade") || promptLower.includes("smooth transition")) {
-      newSettings.crossfadeLength = 16;
-    } else if (promptLower.includes("short crossfade") || promptLower.includes("quick transition")) {
-      newSettings.crossfadeLength = 4;
-    }
-    
-    // Echo/reverb
-    if (promptLower.includes("echo") || promptLower.includes("reverb") || promptLower.includes("spacious")) {
-      newSettings.echo = 0.6;
-    } else if (promptLower.includes("dry") || promptLower.includes("clean")) {
-      newSettings.echo = 0.1;
-    }
-    
-    // Tempo adjustment
-    if (promptLower.includes("faster") || promptLower.includes("energetic")) {
-      newSettings.tempo = 0.2;
-    } else if (promptLower.includes("slower") || promptLower.includes("relaxed")) {
-      newSettings.tempo = -0.2;
-    }
-    
-    console.log("AI-generated settings:", newSettings);
-    return newSettings;
   };
   
   // Simulate creating an actual mix of the two tracks
@@ -450,6 +392,7 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     // Prompt processing
     isProcessingPrompt,
     promptProcessProgress,
+    promptAnalysisResult,
     
     // Mix settings
     mixSettings,

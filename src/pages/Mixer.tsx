@@ -33,6 +33,7 @@ const Mixer: React.FC = () => {
     analyzeProgress,
     isProcessingPrompt,
     promptProcessProgress,
+    promptAnalysisResult,
     mixSettings,
     updateMixSetting,
     handleMix,
