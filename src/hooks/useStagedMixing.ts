@@ -6,6 +6,7 @@ import { MixSettingsType } from '@/types/mixer';
 import { AudioFeatures } from '@/types/audio';
 import { API } from '@/config';
 import { MixingStage, StageStatus, StagedMixSettings } from '@/components/mixer/staged/types';
+import { formatParamLabel } from '@/components/mixer/staged/utils';
 
 interface UseStagedMixingProps {
   track1Url: string | undefined;
@@ -103,21 +104,14 @@ export const useStagedMixing = ({
     if (typeof value === 'boolean') {
       toast({
         title: "Setting Updated",
-        description: `${formatSettingName(settingName)}: ${value ? 'Enabled' : 'Disabled'}`,
+        description: `${formatParamLabel(settingName)}: ${value ? 'Enabled' : 'Disabled'}`,
       });
     } else {
       toast({
         title: "Setting Updated",
-        description: `${formatSettingName(settingName)}: ${Math.round(Number(value) * 100)}%`,
+        description: `${formatParamLabel(settingName)}: ${Math.round(Number(value) * 100)}%`,
       });
     }
-  };
-  
-  // Helper to format setting names for display
-  const formatSettingName = (setting: string): string => {
-    return setting
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase());
   };
   
   // When a stage is completed

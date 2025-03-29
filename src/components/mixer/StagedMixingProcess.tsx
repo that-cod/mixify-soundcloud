@@ -7,6 +7,7 @@ import { StageProgress } from './staged/StageProgress';
 import { StageParameters } from './staged/StageParameters';
 import { StageControls } from './staged/StageControls';
 import { StagePreview } from './staged/StagePreview';
+import { formatParamLabel } from './staged/utils';
 
 interface StagedMixingProcessProps {
   track1Url: string | undefined;
