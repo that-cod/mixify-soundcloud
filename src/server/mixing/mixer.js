@@ -13,6 +13,8 @@ const { matchBPM } = require('./bpmMatcher');
 const { mixProcessedStems } = require('./stemMixer');
 const { applyFinalEffects } = require('./effectsProcessor');
 const { cleanupTempFiles } = require('./utils');
+const { shouldUseLightMode } = require('../audio/processor');
+const os = require('os');
 
 /**
  * Mix two audio tracks together based on provided settings
@@ -26,8 +28,13 @@ async function mixTracks(track1Path, track2Path, settings, outputPath) {
   try {
     console.log('Starting mix process with settings:', settings);
     
-    // Create temporary working directory
-    const tempDir = path.join(path.dirname(outputPath), 'tmp', nanoid());
+    // Check system resources and set optimization level
+    const lightMode = shouldUseLightMode();
+    console.log(`System resources detected: using ${lightMode ? 'light' : 'standard'} mode`);
+    
+    // Create temporary working directory - use system temp if available
+    const tempBaseDir = settings.tempDir || os.tmpdir();
+    const tempDir = path.join(tempBaseDir, 'mixify-tmp', nanoid());
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -43,22 +50,45 @@ async function mixTracks(track1Path, track2Path, settings, outputPath) {
       crossfadeLength: 8,
       echo: 0.2,
       tempo: 0,
+      optimizationLevel: lightMode ? 'light' : 'standard',
       ...settings
     };
+    
+    // Limit features based on optimization level
+    if (mixSettings.optimizationLevel === 'light') {
+      console.log('Using light optimization: some features may be simplified');
+      // Simplify BPM matching for light mode
+      if (mixSettings.bpmMatch && Math.abs(mixSettings.tempo) > 0.2) {
+        console.log('Limiting tempo adjustment in light mode');
+        mixSettings.tempo = Math.sign(mixSettings.tempo) * 0.2;
+      }
+    }
+    
+    // Create unique cache directories for stems
+    const track1StemCachePath = path.join(tempDir, 'cache', `track1_stems.json`);
+    const track2StemCachePath = path.join(tempDir, 'cache', `track2_stems.json`);
     
     // Step 1: Separate stems for both tracks
     console.log('Separating stems for tracks...');
     const [track1Stems, track2Stems] = await Promise.all([
-      separateTracks(track1Path),
-      separateTracks(track2Path)
+      separateTracks(track1Path, {
+        outputDir: path.join(tempDir, 'track1'),
+        lightMode: mixSettings.optimizationLevel === 'light',
+        cachePath: track1StemCachePath
+      }),
+      separateTracks(track2Path, {
+        outputDir: path.join(tempDir, 'track2'),
+        lightMode: mixSettings.optimizationLevel === 'light',
+        cachePath: track2StemCachePath
+      })
     ]);
     
     // Step 2: Process stems based on settings
     console.log('Processing stems...');
     const processedStems = await processStems(track1Stems, track2Stems, mixSettings, tempDir);
     
-    // Step 3: Apply BPM matching if enabled
-    if (mixSettings.bpmMatch) {
+    // Step 3: Apply BPM matching if enabled and not in extremely light mode
+    if (mixSettings.bpmMatch && mixSettings.optimizationLevel !== 'ultra-light') {
       console.log('Applying BPM matching...');
       await matchBPM(processedStems, mixSettings, tempDir);
     }
@@ -67,17 +97,29 @@ async function mixTracks(track1Path, track2Path, settings, outputPath) {
     console.log('Mixing processed stems...');
     await mixProcessedStems(processedStems, mixSettings, outputPath);
     
-    // Step 5: Apply final effects
+    // Step 5: Apply final effects - reduce effects complexity in light mode
     console.log('Applying final effects...');
-    await applyFinalEffects(outputPath, mixSettings);
+    if (mixSettings.optimizationLevel === 'light') {
+      // Simplify effects for performance
+      const lightEffectsSettings = { ...mixSettings };
+      if (lightEffectsSettings.echo > 0.3) {
+        lightEffectsSettings.echo = 0.3;
+      }
+      await applyFinalEffects(outputPath, lightEffectsSettings);
+    } else {
+      await applyFinalEffects(outputPath, mixSettings);
+    }
     
     // Clean up temporary files
-    cleanupTempFiles(tempDir);
+    if (!settings.keepTempFiles) {
+      cleanupTempFiles(tempDir);
+    }
     
     return {
       success: true,
       outputPath,
-      settings: mixSettings
+      settings: mixSettings,
+      optimizationLevel: mixSettings.optimizationLevel
     };
   } catch (error) {
     console.error('Mixing error:', error);
