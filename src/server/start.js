@@ -4,6 +4,7 @@
 const path = require('path');
 const { spawn } = require('cross-spawn');
 const { runSetup } = require('./setup');
+const fs = require('fs');
 
 // Colors for console output
 const colors = {
@@ -16,11 +17,29 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
+// Ensure the uploads directory exists
+function ensureUploadsDirectory() {
+  const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+  const rootDir = isDev ? path.resolve(__dirname, '..') : process.cwd();
+  const uploadsDir = path.join(rootDir, 'uploads');
+  const tempDir = path.join(uploadsDir, 'temp');
+  
+  [uploadsDir, tempDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`${colors.green}Created directory: ${dir}${colors.reset}`);
+    }
+  });
+}
+
 async function main() {
   console.log(`${colors.cyan}=== AI Audio Mixer Backend ===${colors.reset}`);
   console.log(`${colors.cyan}Running setup checks...${colors.reset}`);
   
   try {
+    // Ensure uploads directory exists
+    ensureUploadsDirectory();
+    
     // Run setup checks
     await runSetup();
     

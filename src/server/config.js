@@ -6,9 +6,13 @@ const fs = require('fs');
 // Load environment variables
 dotenv.config();
 
-// Create default .env file if it doesn't exist
+// Determine the base directory
+const isDev = process.env.NODE_ENV === 'development';
+const rootDir = isDev ? path.resolve(__dirname, '..') : process.cwd();
+
+// Create default .env file if it doesn't exist (in development only)
 const envPath = path.join(__dirname, '.env');
-if (!fs.existsSync(envPath)) {
+if (isDev && !fs.existsSync(envPath)) {
   console.log('Creating default .env file...');
   const defaultEnv = `
 # Server configuration
@@ -43,8 +47,8 @@ const config = {
   
   fileStorage: {
     maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB || '25', 10),
-    uploadDir: path.resolve(__dirname, '..', process.env.UPLOAD_DIR || 'uploads'),
-    tempDir: path.resolve(__dirname, '..', process.env.UPLOAD_DIR || 'uploads', 'temp'),
+    uploadDir: path.resolve(rootDir, process.env.UPLOAD_DIR || 'uploads'),
+    tempDir: path.resolve(rootDir, process.env.UPLOAD_DIR || 'uploads', 'temp'),
   },
   
   python: {
@@ -62,6 +66,7 @@ function ensureDirectoriesExist() {
   [config.fileStorage.uploadDir, config.fileStorage.tempDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
+      console.log(`Created directory: ${dir}`);
     }
   });
 }
