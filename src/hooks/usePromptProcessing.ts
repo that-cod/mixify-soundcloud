@@ -1,6 +1,8 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { analyzePromptWithClaude, PromptAnalysisResult } from '@/services/anthropic-service';
+import axios from 'axios';
+import { PromptAnalysisResult } from '@/services/anthropic-service';
 
 interface AudioFeatures {
   bpm: number;
@@ -16,6 +18,9 @@ interface UsePromptProcessingProps {
   applyPromptInstructions?: (analysis: PromptAnalysisResult) => void;
 }
 
+// Backend API URL
+const API_URL = 'http://localhost:5000/api';
+
 export const usePromptProcessing = ({ 
   track1Features, 
   track2Features,
@@ -28,9 +33,6 @@ export const usePromptProcessing = ({
   const [promptAnalysisResult, setPromptAnalysisResult] = useState<PromptAnalysisResult | null>(null);
   
   const { toast } = useToast();
-
-  // The API key is now hardcoded for hackathon use
-  const ANTHROPIC_API_KEY = "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";
 
   // Function to handle AI prompt-based mixing
   const handlePromptMix = async (prompt: string) => {
@@ -52,8 +54,6 @@ export const usePromptProcessing = ({
     });
 
     try {
-      // Use the hardcoded API key instead of getting it from localStorage
-      
       // Progress simulation
       let progress = 0;
       const progressInterval = setInterval(() => {
@@ -63,16 +63,18 @@ export const usePromptProcessing = ({
         }
       }, 300);
       
-      // Process the prompt with Claude API
-      const analysisResult = await analyzePromptWithClaude(
-        prompt, 
-        track1Features, 
-        track2Features,
-        ANTHROPIC_API_KEY
-      );
+      // Process the prompt using the backend API
+      const response = await axios.post(`${API_URL}/process-prompt`, {
+        prompt,
+        track1Features,
+        track2Features
+      });
       
       clearInterval(progressInterval);
       setPromptProcessProgress(100);
+      
+      // Extract analysis result from response
+      const analysisResult: PromptAnalysisResult = response.data.analysis;
       
       // Save the analysis result
       setPromptAnalysisResult(analysisResult);
@@ -100,16 +102,63 @@ export const usePromptProcessing = ({
     } catch (error) {
       console.error("Error processing prompt:", error);
       
-      toast({
-        title: "Prompt Processing Failed",
-        description: error instanceof Error ? error.message : "Failed to process your instructions. Please try again.",
-        variant: "destructive",
-      });
-      
-      setIsProcessingPrompt(false);
-      setPromptProcessProgress(0);
-      return false;
+      // Try fallback to the old Claude API directly
+      try {
+        return await fallbackPromptProcessing(prompt);
+      } catch (fallbackError) {
+        console.error("Fallback prompt processing failed:", fallbackError);
+        
+        toast({
+          title: "Prompt Processing Failed",
+          description: "Failed to process your instructions. Please try again.",
+          variant: "destructive",
+        });
+        
+        setIsProcessingPrompt(false);
+        setPromptProcessProgress(0);
+        return false;
+      }
     }
+  };
+
+  // Fallback to direct Claude API if backend is not available
+  const fallbackPromptProcessing = async (prompt: string) => {
+    console.log("Using fallback prompt processing method");
+    
+    // The API key is now hardcoded for hackathon use
+    const ANTHROPIC_API_KEY = "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";
+    
+    // Import the old analysis function
+    const { analyzePromptWithClaude } = await import('@/services/anthropic-service');
+    
+    // Process the prompt with Claude API
+    const analysisResult = await analyzePromptWithClaude(
+      prompt, 
+      track1Features, 
+      track2Features,
+      ANTHROPIC_API_KEY
+    );
+    
+    // Save the analysis result
+    setPromptAnalysisResult(analysisResult);
+    
+    // Apply the AI-suggested settings
+    updateMixSettings(analysisResult.recommendedSettings);
+    
+    // If additional instruction processing is available, use it
+    if (applyPromptInstructions) {
+      applyPromptInstructions(analysisResult);
+    }
+    
+    // Display the results to the user
+    toast({
+      title: "Analysis Complete (Fallback Mode)",
+      description: analysisResult.summary || "AI has determined the optimal mix settings based on your prompt!",
+    });
+    
+    setIsProcessingPrompt(false);
+    setPromptProcessProgress(100);
+    return true;
   };
 
   // Analyze instructions for debugging and insights

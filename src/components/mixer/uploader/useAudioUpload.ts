@@ -1,12 +1,15 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import axios from 'axios';
 import { 
   AUDIO_BUCKET, 
   checkBucketStatus,
-  uploadAudioFile,
   type BucketStatus
 } from '@/services/storage-service';
+
+// Backend API URL
+const API_URL = 'http://localhost:5000/api';
 
 interface UseAudioUploadProps {
   trackNumber: 1 | 2;
@@ -31,30 +34,8 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
         const status = await checkBucketStatus();
         setBucketStatus(status);
         
-        // Show appropriate notifications based on bucket status
         if (!status.exists) {
-          console.error(`Bucket "${AUDIO_BUCKET}" doesn't exist`);
-          toast({
-            title: "Storage Bucket Issue",
-            description: `Bucket "${AUDIO_BUCKET}" not found. You can still try uploading.`,
-            variant: "warning",
-          });
-        } else if (!status.canUpload) {
-          console.error(`Cannot upload to bucket "${AUDIO_BUCKET}"`);
-          toast({
-            title: "Upload Permission Issue",
-            description: "Permission issues detected, but you can still try uploading.",
-            variant: "warning",
-          });
-        } else if (!status.isPublic) {
-          console.warn(`Bucket "${AUDIO_BUCKET}" is not public`);
-          toast({
-            title: "Storage Warning",
-            description: "The storage bucket is not set to public. Files might not be accessible.",
-            variant: "warning",
-          });
-        } else {
-          console.log(`Bucket "${AUDIO_BUCKET}" is ready for uploads`);
+          console.log("Storage bucket doesn't exist, will use backend upload instead");
         }
       } catch (err: any) {
         console.error(`Error verifying bucket:`, err);
@@ -66,7 +47,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
         });
         toast({
           title: "Storage Check Failed",
-          description: "Storage verification failed, but you can still try uploading.",
+          description: "Using backend upload system instead.",
           variant: "warning",
         });
       } finally {
@@ -128,17 +109,30 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       setUploading(true);
       setProgress(5); // Start with some initial progress
       
-      // Use our upload service - always attempt, even if bucket check failed
-      const result = await uploadAudioFile(
-        file, 
-        trackNumber,
-        (progress) => setProgress(progress)
-      );
+      // Backend upload using API
+      const formData = new FormData();
+      formData.append('track', file);
       
-      console.log(`Upload completed:`, result);
+      const response = await axios.post(`${API_URL}/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 95) / progressEvent.total);
+            setProgress(percentCompleted);
+          }
+        }
+      });
+      
+      console.log(`Upload completed:`, response.data);
+      setProgress(100);
+      
+      // Construct file URL for frontend use
+      const fileUrl = response.data.filePath;
       
       // Notify parent component
-      onUploadComplete(result.publicUrl, file.name);
+      onUploadComplete(fileUrl, file.name);
       
       toast({
         title: "Upload complete",
@@ -147,26 +141,48 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
     } catch (error: any) {
       console.error(`Error uploading file:`, error);
       
-      // Show user-friendly error message
-      let errorMessage = "An error occurred during upload.";
-      
-      if (error.message) {
-        if (error.message.includes('permission') || error.message.includes('authorized')) {
-          errorMessage = "Permission denied. Check Supabase storage settings.";
-        } else if (error.message.includes('not found') || error.message.includes('404')) {
-          errorMessage = `Storage bucket "${AUDIO_BUCKET}" not found. Check Supabase storage.`;
-        } else if (error.message.includes('network') || error.message.includes('connection')) {
-          errorMessage = "Network error. Check your internet connection.";
-        } else {
-          errorMessage = error.message;
+      // Try fallback to Supabase if backend upload fails
+      if (bucketStatus?.exists && bucketStatus?.canUpload) {
+        // Import the upload function dynamically to avoid circular dependencies
+        const { uploadAudioFile } = await import('@/services/storage-service');
+        
+        try {
+          toast({
+            title: "Trying fallback upload",
+            description: "Backend upload failed. Trying alternative upload method...",
+          });
+          
+          const result = await uploadAudioFile(
+            file, 
+            trackNumber,
+            (progress) => setProgress(progress)
+          );
+          
+          console.log(`Fallback upload completed:`, result);
+          
+          // Notify parent component
+          onUploadComplete(result.publicUrl, file.name);
+          
+          toast({
+            title: "Upload complete (fallback)",
+            description: `Track ${trackNumber} uploaded successfully.`,
+          });
+        } catch (fallbackError: any) {
+          console.error(`Fallback upload failed:`, fallbackError);
+          
+          toast({
+            title: "Upload failed",
+            description: "Both upload methods failed. Please try again later.",
+            variant: "destructive",
+          });
         }
+      } else {
+        toast({
+          title: "Upload failed",
+          description: error.response?.data?.error || "Failed to upload file. Please try again.",
+          variant: "destructive",
+        });
       }
-      
-      toast({
-        title: "Upload failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
     } finally {
       setUploading(false);
       

@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { matchBPM, harmonicMixing } from '@/utils/audioAnalysis';
+import axios from 'axios';
 import WaveSurfer from 'wavesurfer.js';
 import { PromptAnalysisResult, MixingInstruction } from '@/services/anthropic-service';
 
@@ -30,6 +30,9 @@ interface UseMixingEngineProps {
   track1Features: AudioFeatures | null;
   track2Features: AudioFeatures | null;
 }
+
+// Backend API URL
+const API_URL = 'http://localhost:5000/api';
 
 export const useMixingEngine = ({
   track1Url,
@@ -69,6 +72,31 @@ export const useMixingEngine = ({
   // Last prompt analysis results
   const [lastPromptAnalysis, setLastPromptAnalysis] = useState<PromptAnalysisResult | null>(null);
   
+  // Track uploaded file info
+  const [track1Info, setTrack1Info] = useState<{path: string, name: string} | null>(null);
+  const [track2Info, setTrack2Info] = useState<{path: string, name: string} | null>(null);
+  
+  // When track URLs change, update track info
+  useEffect(() => {
+    if (track1Url) {
+      // In a real implementation, this would store the actual path returned from the upload API
+      setTrack1Info({
+        path: track1Url,
+        name: track1Url.split('/').pop() || 'track1.mp3'
+      });
+    }
+  }, [track1Url]);
+  
+  useEffect(() => {
+    if (track2Url) {
+      // In a real implementation, this would store the actual path returned from the upload API
+      setTrack2Info({
+        path: track2Url,
+        name: track2Url.split('/').pop() || 'track2.mp3'
+      });
+    }
+  }, [track2Url]);
+  
   const updateMixSetting = (setting: keyof MixSettingsType, value: number | boolean) => {
     setMixSettings(prev => ({
       ...prev,
@@ -103,7 +131,7 @@ export const useMixingEngine = ({
     });
   };
   
-  const handleMix = () => {
+  const handleMix = async () => {
     if (!track1Url || !track2Url) {
       toast({
         title: "Missing tracks",
@@ -122,7 +150,17 @@ export const useMixingEngine = ({
       return;
     }
     
+    if (!track1Info || !track2Info) {
+      toast({
+        title: "Track information missing",
+        description: "Track information is not available. Please reload and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsMixing(true);
+    setMixProgress(0);
     
     // Check if we have prompt analysis to use
     if (lastPromptAnalysis) {
@@ -133,33 +171,72 @@ export const useMixingEngine = ({
       });
     }
     
-    // Apply mix settings based on track features and current settings
-    let appliedSettings = { ...mixSettings };
-    
-    // Adjust settings based on track features
-    if (appliedSettings.bpmMatch && track1Features.bpm !== track2Features.bpm) {
-      console.log(`Matching BPM: ${track1Features.bpm} → ${track2Features.bpm}`);
-      // In a real implementation, we would calculate the BPM adjustment factor
+    try {
+      // Simulate mixing process steps for UI feedback
+      simulateMixingProgress();
+      
+      // Call the backend API to mix the tracks
+      const response = await axios.post(`${API_URL}/mix`, {
+        track1Path: track1Info.path,
+        track2Path: track2Info.path,
+        settings: mixSettings,
+        outputFileName: `mixed-${Date.now()}.mp3`
+      });
+      
+      // Get the mixed track URL from the response
+      const mixedUrl = response.data.mixedTrackPath;
+      
+      // Set the mixed track URL
+      setMixedTrackUrl(mixedUrl);
+      
+      setIsMixing(false);
+      setMixProgress(100);
+      
+      toast({
+        title: "Mix complete",
+        description: lastPromptAnalysis 
+          ? "Your AI-guided mix is ready!" 
+          : "Your tracks have been successfully mixed!",
+      });
+      
+    } catch (error) {
+      console.error("Mixing error:", error);
+      
+      // Fallback to frontend simulation if backend fails
+      fallbackMixing();
+      
+      toast({
+        title: "Backend Mixing Failed",
+        description: "Using fallback mixing mode. Limited features available.",
+        variant: "warning",
+      });
     }
+  };
+  
+  // Fallback to frontend simulation if backend is not available
+  const fallbackMixing = () => {
+    console.log("Using fallback mixing method");
     
-    // Check if keys are harmonic
-    if (appliedSettings.keyMatch) {
-      const areHarmonic = harmonicMixing(track1Features.key, track2Features.key);
-      if (!areHarmonic) {
-        console.log(`Keys not harmonic: ${track1Features.key} and ${track2Features.key}`);
-        toast({
-          title: "Key Adjustment",
-          description: `Harmonizing keys: ${track1Features.key} and ${track2Features.key}`,
-        });
-      }
-    }
-    
-    // Create descriptive steps based on actual settings
-    const steps = createMixingSteps(appliedSettings, track1Features, track2Features);
-    
-    // Simulate mixing process with detailed steps
+    // For demo purposes, we'll set the mixed track URL to one of the original tracks
+    // In a real app, this would be a new audio file generated by the backend
+    setTimeout(() => {
+      setMixedTrackUrl(track1Url);
+      setIsMixing(false);
+      setMixProgress(100);
+      
+      toast({
+        title: "Mix complete (Simulation)",
+        description: "Your tracks have been combined with simulated mixing.",
+      });
+    }, 3000);
+  };
+  
+  // Simulate mixing progress for UI feedback
+  const simulateMixingProgress = () => {
+    const steps = createMixingSteps(mixSettings, track1Features, track2Features);
     let progress = 0;
     let currentStep = 0;
+    
     const interval = setInterval(() => {
       progress += 5;
       setMixProgress(progress);
@@ -173,20 +250,8 @@ export const useMixingEngine = ({
         currentStep++;
       }
       
-      if (progress >= 100) {
+      if (progress >= 95) {
         clearInterval(interval);
-        setIsMixing(false);
-        // In a real implementation, we would use both tracks to create a mix
-        if (track1Url && track2Url) {
-          createMixWithSettings(track1Url, track2Url, appliedSettings);
-        }
-        
-        toast({
-          title: "Mix complete",
-          description: lastPromptAnalysis 
-            ? "Your AI-guided mix is ready!" 
-            : "Your tracks have been successfully mixed!",
-        });
       }
     }, 500);
   };
@@ -246,25 +311,6 @@ export const useMixingEngine = ({
     steps.push("Finalizing mix...");
     
     return steps;
-  };
-  
-  // Create a mix with the specified settings
-  const createMixWithSettings = (track1: string, track2: string, settings: MixSettingsType) => {
-    console.log(`Creating mix of ${track1} and ${track2}`);
-    console.log("Using mix settings:", settings);
-    
-    // In a real implementation, this would create an actual mix of the two audio files
-    // For this demo, we'll combine the tracks in a simple concatenation
-    
-    // For demo purposes, we'll set the mixed track URL
-    // In a real app, this would be a new audio file generated by the backend
-    setMixedTrackUrl(track1);
-    
-    // In a real implementation, we might do something like:
-    // const combinedTrackUrl = await audioProcessingService.combineAudioTracks(
-    //   track1, track2, settings
-    // );
-    // setMixedTrackUrl(combinedTrackUrl);
   };
   
   const togglePlayback = () => {
