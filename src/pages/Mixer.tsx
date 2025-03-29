@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +19,8 @@ const Mixer: React.FC = () => {
   
   // Use custom hooks
   const { bucketStatus, storageBucketChecking } = useBucketStatus();
+  
+  // Use the refactored mixer controls hook
   const {
     isMixing,
     mixProgress,
