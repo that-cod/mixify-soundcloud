@@ -22,12 +22,13 @@ export const Footer: React.FC = () => {
             <Link to="/about" className="text-gray-300 hover:text-white text-sm">
               About
             </Link>
-            <Link to="/privacy" className="text-gray-300 hover:text-white text-sm">
+            {/* Remove links to non-existent routes */}
+            <a href="#" className="text-gray-300 hover:text-white text-sm">
               Privacy
-            </Link>
-            <Link to="/terms" className="text-gray-300 hover:text-white text-sm">
+            </a>
+            <a href="#" className="text-gray-300 hover:text-white text-sm">
               Terms
-            </Link>
+            </a>
           </div>
           
           <div className="flex gap-4">
