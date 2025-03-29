@@ -7,9 +7,7 @@ import {
   checkBucketStatus,
   type BucketStatus
 } from '@/services/storage-service';
-
-// Backend API URL
-const API_URL = 'http://localhost:5000/api';
+import { API, AUDIO_SETTINGS } from '@/config';
 
 interface UseAudioUploadProps {
   trackNumber: 1 | 2;
@@ -68,7 +66,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
     }
     
     // Validate file type
-    if (!selectedFile.type.startsWith('audio/')) {
+    if (!AUDIO_SETTINGS.supportedFormats.includes(selectedFile.type)) {
       console.warn(`Invalid file type:`, selectedFile.type);
       toast({
         title: "Invalid file type",
@@ -78,12 +76,12 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       return;
     }
     
-    // Validate file size (20MB max)
-    if (selectedFile.size > 20 * 1024 * 1024) {
+    // Validate file size 
+    if (selectedFile.size > AUDIO_SETTINGS.maxUploadSizeMB * 1024 * 1024) {
       console.warn(`File too large:`, (selectedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
       toast({
         title: "File too large",
-        description: "Please upload an audio file smaller than 20MB.",
+        description: `Please upload an audio file smaller than ${AUDIO_SETTINGS.maxUploadSizeMB}MB.`,
         variant: "destructive",
       });
       return;
@@ -113,7 +111,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       const formData = new FormData();
       formData.append('track', file);
       
-      const response = await axios.post(`${API_URL}/upload`, formData, {
+      const response = await axios.post(API.endpoints.upload, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         },

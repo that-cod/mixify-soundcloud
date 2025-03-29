@@ -1,7 +1,7 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
+import { API } from '@/config';
 
 interface AudioFeatures {
   bpm: number;
@@ -18,9 +18,6 @@ interface SeparatedTracks {
   drums: string;
   bass: string;
 }
-
-// Backend API URL - change this to your server URL
-const API_URL = 'http://localhost:5000/api';
 
 export const useAudioAnalysis = () => {
   // Audio analysis states
@@ -53,11 +50,10 @@ export const useAudioAnalysis = () => {
       }, 300);
       
       // Extract file path from URL
-      // In a real implementation, this would be the file path returned by the upload API
       const filePath = trackUrl;
       
       // Call the backend to analyze the audio
-      const response = await axios.post(`${API_URL}/analyze`, {
+      const response = await axios.post(API.endpoints.analyze, {
         filePath,
         trackNumber
       });
@@ -81,7 +77,6 @@ export const useAudioAnalysis = () => {
       });
       
       // For now, we'll skip actual stem separation to simplify
-      // In a real implementation, this would be part of the analysis or a separate API call
       
       if (trackNumber === 1) {
         setTrack1Separated({

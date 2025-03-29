@@ -1,8 +1,8 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { API } from '@/config';
 
 interface AudioFeatures {
   bpm: number;
@@ -17,9 +17,6 @@ interface UsePromptProcessingProps {
   updateMixSettings: (settings: any) => void;
   applyPromptInstructions?: (analysis: PromptAnalysisResult) => void;
 }
-
-// Backend API URL
-const API_URL = 'http://localhost:5000/api';
 
 export const usePromptProcessing = ({ 
   track1Features, 
@@ -64,7 +61,7 @@ export const usePromptProcessing = ({
       }, 300);
       
       // Process the prompt using the backend API
-      const response = await axios.post(`${API_URL}/process-prompt`, {
+      const response = await axios.post(API.endpoints.processPrompt, {
         prompt,
         track1Features,
         track2Features

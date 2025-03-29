@@ -1,12 +1,9 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import { MixSettingsType } from '@/types/mixer';
 import { AudioFeatures } from '@/types/audio';
-
-// Backend API URL
-const API_URL = 'http://localhost:5000/api';
+import { API } from '@/config';
 
 interface UseMixOperationsProps {
   track1Url: string | undefined;
@@ -177,7 +174,7 @@ export const useMixOperations = ({
       simulateMixingProgress(mixSettings);
       
       // Call the backend API to mix the tracks
-      const response = await axios.post(`${API_URL}/mix`, {
+      const response = await axios.post(API.endpoints.mix, {
         track1Path: track1Info.path,
         track2Path: track2Info.path,
         settings: mixSettings,
