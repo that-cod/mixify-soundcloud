@@ -1,9 +1,10 @@
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAudioAnalysis } from './useAudioAnalysis';
 import { usePromptProcessing } from './usePromptProcessing';
 import { useMixingEngine } from './useMixingEngine';
 import { getInstructionInsights } from '@/utils/ai-prompt-analysis';
+import { useStagedMixing } from './useStagedMixing';
 
 interface UseMixerControlsProps {
   track1Url: string | undefined;
@@ -11,6 +12,9 @@ interface UseMixerControlsProps {
 }
 
 export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps) => {
+  // Mixing mode state
+  const [mixingMode, setMixingMode] = useState<'standard' | 'staged'>('standard');
+  
   // Use the refactored hooks
   const {
     track1Features,
@@ -21,6 +25,17 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     analyzeProgress,
     analyzeTrack
   } = useAudioAnalysis();
+  
+  // Track info derivation
+  const track1Info = track1Url ? { 
+    path: track1Url.replace('/api/tracks/', ''),
+    name: track1Url.split('/').pop() || 'Track 1'
+  } : null;
+  
+  const track2Info = track2Url ? {
+    path: track2Url.replace('/api/tracks/', ''),
+    name: track2Url.split('/').pop() || 'Track 2'
+  } : null;
   
   // Initialize mixing engine first so we can pass its methods to the prompt processor
   const {
@@ -45,6 +60,31 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     track2Url,
     track1Features,
     track2Features
+  });
+  
+  // Initialize staged mixing hook
+  const {
+    isActiveStage,
+    currentStage,
+    stageStatus,
+    stageProgress,
+    overallProgress,
+    mixedTrackUrl: stagedMixedTrackUrl,
+    stagePreviewUrl,
+    stagedSettings,
+    startStagedMixing,
+    cancelStagedMixing,
+    updateStagedSetting,
+    completeStage,
+    completeMixing,
+    convertToMixSettings
+  } = useStagedMixing({
+    track1Url,
+    track2Url,
+    track1Features,
+    track2Features,
+    track1Info,
+    track2Info
   });
   
   // Now initialize prompt processing with the applyPromptInstructions function
@@ -72,6 +112,9 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
       analyzeTrack(track2Url, 2);
     }
   }, [track2Url, track2Features]);
+  
+  // Update effective mixed track URL based on mode
+  const effectiveMixedTrackUrl = mixingMode === 'staged' ? stagedMixedTrackUrl : mixedTrackUrl;
 
   // Create a wrapper for the handlePromptMix function to connect it with the mix workflow
   const processPromptAndMix = async (prompt: string) => {
@@ -83,12 +126,17 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     }
     return false;
   };
+  
+  // Toggle between standard and staged mixing modes
+  const toggleMixingMode = () => {
+    setMixingMode(prev => prev === 'standard' ? 'staged' : 'standard');
+  };
 
   return {
     // State
     isMixing,
     mixProgress,
-    mixedTrackUrl,
+    mixedTrackUrl: effectiveMixedTrackUrl,
     isPlaying,
     volume,
     setVolume,
@@ -108,6 +156,20 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     // Mix settings
     mixSettings,
     updateMixSetting,
+    
+    // Staged mixing states and methods
+    mixingMode,
+    toggleMixingMode,
+    isActiveStage,
+    currentStage,
+    stageStatus,
+    stageProgress,
+    overallProgress,
+    stagePreviewUrl,
+    stagedSettings,
+    startStagedMixing,
+    cancelStagedMixing,
+    updateStagedSetting,
     
     // Methods
     handleMix,

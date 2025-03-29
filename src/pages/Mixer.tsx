@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layouts/MainLayout';
@@ -44,6 +45,14 @@ const Mixer: React.FC = () => {
     handleTrack1WavesurferReady,
     handleTrack2WavesurferReady,
     handleMixedWavesurferReady,
+    // New staged mixing properties
+    mixingMode,
+    toggleMixingMode,
+    isActiveStage,
+    startStagedMixing,
+    cancelStagedMixing,
+    stagedSettings,
+    updateStagedSetting,
   } = useMixerControls({ track1Url, track2Url });
   
   // Redirect if not logged in
@@ -128,6 +137,15 @@ const Mixer: React.FC = () => {
             isProcessingPrompt={isProcessingPrompt}
             promptProcessProgress={promptProcessProgress}
             handlePromptMix={handlePromptMix}
+            promptAnalysisResult={promptAnalysisResult}
+            // New staged mixing props
+            mixingMode={mixingMode}
+            toggleMixingMode={toggleMixingMode}
+            isActiveStage={isActiveStage}
+            startStagedMixing={startStagedMixing}
+            cancelStagedMixing={cancelStagedMixing}
+            stagedSettings={stagedSettings}
+            updateStagedSetting={updateStagedSetting}
           />
         </div>
       </div>

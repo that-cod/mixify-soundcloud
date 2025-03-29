@@ -1,11 +1,10 @@
 
+// Audio feature types
 export interface AudioFeatures {
   bpm: number;
   key: string;
   energy: number;
   clarity: number;
-  waveform?: number[];
-  spectrum?: Record<string, number>;
 }
 
 export interface SeparatedTracks {
