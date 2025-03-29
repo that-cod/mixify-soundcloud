@@ -1,4 +1,3 @@
-
 /**
  * Stem separator module
  * Handles separation of audio tracks into stems using Python
@@ -6,10 +5,28 @@
 
 const path = require('path');
 const fs = require('fs');
-const { runPythonScript, runPythonScriptWithProgress } = require('../pythonBridge');
+const { runPythonScript, runPythonScriptWithProgress, checkPythonEnvironment } = require('../pythonBridge');
 const { shouldUseLightMode } = require('./processor');
 const config = require('../config');
 const { nanoid } = require('nanoid');
+
+/**
+ * Initialize the stem separator module
+ * @returns {Promise<boolean>} True if initialization successful
+ */
+async function initStemSeparator() {
+  try {
+    // Check Python environment and dependencies
+    const pythonEnv = await checkPythonEnvironment();
+    
+    console.log(`Stem separator initialized. Spleeter available: ${pythonEnv.pythonHasSpleeter ? 'Yes' : 'No'}`);
+    
+    return pythonEnv.pythonHasSpleeter;
+  } catch (error) {
+    console.error('Error initializing stem separator:', error);
+    return false;
+  }
+}
 
 /**
  * Separates an audio file into stems (vocals, drums, bass, other)
@@ -23,6 +40,9 @@ async function separateTracks(filePath, options = {}) {
     if (!fs.existsSync(filePath)) {
       throw new Error(`Audio file not found: ${filePath}`);
     }
+    
+    // Ensure Python environment is properly set up
+    await checkPythonEnvironment();
     
     // Default options
     const defaultOptions = {
@@ -219,5 +239,6 @@ async function createFallbackStems(filePath, outputDir) {
 }
 
 module.exports = {
-  separateTracks
+  separateTracks,
+  initStemSeparator
 };

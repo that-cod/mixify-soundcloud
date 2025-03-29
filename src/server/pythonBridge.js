@@ -4,6 +4,7 @@ const { PythonShell } = require('python-shell');
 const fs = require('fs');
 const os = require('os');
 const config = require('./config');
+const { spawn } = require('cross-spawn');
 
 // Cache for checking if Python scripts exist
 const scriptExistsCache = {};
@@ -54,8 +55,140 @@ async function checkPythonEnvironment() {
     }
   }
   
-  // Check for librosa
+  // Check and install required Python packages
+  await checkAndInstallPythonDependencies();
+  
+  pythonEnvChecked = true;
+  
+  return {
+    pythonPath,
+    pythonHasLibrosa,
+    pythonHasSpleeter
+  };
+}
+
+/**
+ * Check for and install missing Python packages
+ */
+async function checkAndInstallPythonDependencies() {
+  console.log('Checking Python dependencies...');
+  
+  // Create a simple script to check required packages
+  const checkScript = `
+import sys
+import importlib.util
+import json
+
+required_packages = [
+    "librosa", "numpy", "scipy", "spleeter", 
+    "tensorflow", "pydub", "soundfile", "tqdm"
+]
+
+results = {}
+
+for package in required_packages:
+    spec = importlib.util.find_spec(package)
+    is_installed = spec is not None
+    
+    results[package] = {
+        "installed": is_installed
+    }
+    
+    if is_installed:
+        try:
+            module = importlib.import_module(package)
+            if hasattr(module, "__version__"):
+                results[package]["version"] = module.__version__
+            else:
+                results[package]["version"] = "unknown"
+        except Exception as e:
+            results[package]["error"] = str(e)
+
+# Check tensor flow specifically
+have_gpu = False
+if results.get("tensorflow", {}).get("installed", False):
+    try:
+        import tensorflow as tf
+        have_gpu = len(tf.config.list_physical_devices('GPU')) > 0
+        results["tensorflow"]["gpu_available"] = have_gpu
+    except:
+        results["tensorflow"]["gpu_available"] = False
+
+print(json.dumps(results))
+`;
+
+  // Write the script to a temporary file
+  const tempScriptPath = path.join(os.tmpdir(), 'check_python_deps.py');
+  fs.writeFileSync(tempScriptPath, checkScript);
+  
   try {
+    // Run the script
+    const results = await new Promise((resolve, reject) => {
+      PythonShell.run(tempScriptPath, { pythonPath }, (err, output) => {
+        if (err) reject(err);
+        else {
+          try {
+            // Parse the first output as JSON
+            const jsonOutput = JSON.parse(output && output.length > 0 ? output[0] : '{}');
+            resolve(jsonOutput);
+          } catch (e) {
+            reject(new Error(`Failed to parse Python dependency check output: ${e.message}`));
+          }
+        }
+      });
+    });
+    
+    // Clean up the temporary file
+    fs.unlinkSync(tempScriptPath);
+    
+    // Process results
+    const missingPackages = [];
+    
+    for (const [pkg, info] of Object.entries(results)) {
+      if (!info.installed) {
+        missingPackages.push(pkg);
+        console.log(`Package ${pkg} is not installed`);
+      } else {
+        console.log(`Package ${pkg} v${info.version || 'unknown'} is installed`);
+        
+        // Update global variables for key packages
+        if (pkg === 'librosa') pythonHasLibrosa = true;
+        if (pkg === 'spleeter') pythonHasSpleeter = true;
+        
+        // Show GPU info for TensorFlow
+        if (pkg === 'tensorflow' && 'gpu_available' in info) {
+          if (info.gpu_available) {
+            console.log(`TensorFlow has GPU support!`);
+          } else {
+            console.log(`TensorFlow is running in CPU-only mode`);
+          }
+        }
+      }
+    }
+    
+    // Install missing packages if any
+    if (missingPackages.length > 0) {
+      console.log(`Installing missing Python packages: ${missingPackages.join(', ')}`);
+      await installPythonDependencies(missingPackages);
+      
+      // Recheck the critical packages
+      await recheckCriticalPackages();
+    }
+    
+  } catch (error) {
+    console.error(`Error checking Python dependencies: ${error}`);
+    
+    // Try to install all dependencies anyway
+    await installAllRequiredDependencies();
+  }
+}
+
+/**
+ * Recheck if critical packages are installed after installation
+ */
+async function recheckCriticalPackages() {
+  try {
+    // Check for librosa
     const librosaResult = await new Promise((resolve) => {
       PythonShell.runString(
         'try:\n  import librosa\n  print("ok")\nexcept ImportError:\n  print("missing")', 
@@ -68,13 +201,9 @@ async function checkPythonEnvironment() {
                       librosaResult.output && 
                       librosaResult.output.includes('ok');
     
-    console.log(`Librosa available: ${pythonHasLibrosa ? 'Yes' : 'No'}`);
-  } catch (err) {
-    console.error('Error checking for librosa:', err);
-  }
-  
-  // Check for spleeter
-  try {
+    console.log(`Librosa available after installation: ${pythonHasLibrosa ? 'Yes' : 'No'}`);
+    
+    // Check for spleeter
     const spleeterResult = await new Promise((resolve) => {
       PythonShell.runString(
         'try:\n  import spleeter\n  print("ok")\nexcept ImportError:\n  print("missing")', 
@@ -87,18 +216,140 @@ async function checkPythonEnvironment() {
                         spleeterResult.output && 
                         spleeterResult.output.includes('ok');
     
-    console.log(`Spleeter available: ${pythonHasSpleeter ? 'Yes' : 'No'}`);
+    console.log(`Spleeter available after installation: ${pythonHasSpleeter ? 'Yes' : 'No'}`);
   } catch (err) {
-    console.error('Error checking for spleeter:', err);
+    console.error(`Error rechecking Python packages: ${err}`);
   }
-  
-  pythonEnvChecked = true;
-  
-  return {
-    pythonPath,
-    pythonHasLibrosa,
-    pythonHasSpleeter
-  };
+}
+
+/**
+ * Install specific Python packages
+ * @param {string[]} packages - Array of package names to install
+ */
+async function installPythonDependencies(packages = []) {
+  return new Promise((resolve) => {
+    console.log(`Installing Python packages: ${packages.join(', ')}`);
+    
+    // Install packages one by one for better error reporting
+    const installPromises = packages.map(pkg => {
+      return new Promise((resolvePackage) => {
+        console.log(`Installing ${pkg}...`);
+        
+        // For tensorflow, use platform specific package name
+        let packageToInstall = pkg;
+        if (pkg === 'tensorflow') {
+          const platform = os.platform();
+          const arch = os.arch();
+          if (platform === 'darwin' && arch === 'arm64') {
+            packageToInstall = 'tensorflow-macos';
+            // Also install metal plugin for M1/M2 Macs
+            installPackage('tensorflow-metal').catch(err => {
+              console.warn(`Failed to install tensorflow-metal: ${err.message}`);
+            });
+          }
+        }
+        
+        installPackage(packageToInstall)
+          .then(() => {
+            console.log(`Successfully installed ${pkg}`);
+            resolvePackage();
+          })
+          .catch(err => {
+            console.error(`Failed to install ${pkg}: ${err.message}`);
+            resolvePackage(); // Continue despite errors
+          });
+      });
+    });
+    
+    Promise.all(installPromises)
+      .then(() => {
+        console.log('All package installations completed');
+        resolve();
+      })
+      .catch(err => {
+        console.error(`Error during package installation: ${err.message}`);
+        resolve(); // Continue despite errors
+      });
+  });
+}
+
+/**
+ * Install a single Python package
+ * @param {string} packageName - Name of the package to install
+ */
+function installPackage(packageName) {
+  return new Promise((resolve, reject) => {
+    const pipInstall = spawn(pythonPath, ['-m', 'pip', 'install', packageName]);
+    
+    pipInstall.stdout.on('data', (data) => {
+      console.log(`${data.toString().trim()}`);
+    });
+    
+    pipInstall.stderr.on('data', (data) => {
+      console.warn(`${data.toString().trim()}`);
+    });
+    
+    pipInstall.on('error', (err) => {
+      reject(new Error(`Failed to install ${packageName}: ${err.message}`));
+    });
+    
+    pipInstall.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Installation exited with code ${code}`));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+/**
+ * Install all required dependencies from requirements.txt
+ */
+async function installAllRequiredDependencies() {
+  return new Promise((resolve) => {
+    console.log('Installing all required Python dependencies from requirements.txt');
+    
+    // Read requirements from file
+    const requirementsPath = path.join(__dirname, 'requirements.txt');
+    
+    if (!fs.existsSync(requirementsPath)) {
+      console.error('requirements.txt not found.');
+      resolve(false);
+      return;
+    }
+    
+    // Install requirements
+    const pipInstall = spawn(pythonPath, ['-m', 'pip', 'install', '-r', requirementsPath]);
+    
+    pipInstall.stdout.on('data', (data) => {
+      console.log(data.toString().trim());
+    });
+    
+    pipInstall.stderr.on('data', (data) => {
+      console.warn(data.toString().trim());
+    });
+    
+    pipInstall.on('error', (err) => {
+      console.error(`Failed to install Python dependencies: ${err}`);
+      resolve(false);
+    });
+    
+    pipInstall.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`Python dependencies installation failed with code: ${code}`);
+        resolve(false);
+        return;
+      }
+      
+      console.log('Python dependencies installed successfully.');
+      
+      // Recheck critical packages
+      recheckCriticalPackages()
+        .then(() => resolve(true))
+        .catch(() => resolve(false));
+    });
+  });
 }
 
 /**

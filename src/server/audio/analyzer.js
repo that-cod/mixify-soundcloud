@@ -6,9 +6,29 @@
 
 const path = require('path');
 const fs = require('fs');
-const { runPythonScript } = require('../pythonBridge');
+const { runPythonScript, checkPythonEnvironment } = require('../pythonBridge');
 const config = require('../config');
 const { nanoid } = require('nanoid');
+
+/**
+ * Initialize the analyzer module
+ * @returns {Promise<boolean>} True if initialization successful
+ */
+async function initAnalyzer() {
+  try {
+    // Check Python environment and dependencies
+    const pythonEnv = await checkPythonEnvironment();
+    
+    console.log(`Analyzer initialized. Python dependencies available: 
+      - librosa: ${pythonEnv.pythonHasLibrosa ? 'Yes' : 'No'}
+      - spleeter: ${pythonEnv.pythonHasSpleeter ? 'Yes' : 'No'}`);
+    
+    return true;
+  } catch (error) {
+    console.error('Error initializing audio analyzer:', error);
+    return false;
+  }
+}
 
 /**
  * Analyze an audio file to extract features
@@ -55,6 +75,9 @@ async function analyzeAudio(filePath, options = {}) {
         console.warn(`Cache read failed:`, cacheError.message);
       }
     }
+    
+    // Ensure Python environment is properly set up
+    await checkPythonEnvironment();
     
     // Run Python analysis script to extract audio features
     let features;
@@ -134,5 +157,6 @@ function createFallbackAnalysis(filePath) {
 }
 
 module.exports = {
-  analyzeAudio
+  analyzeAudio,
+  initAnalyzer
 };
