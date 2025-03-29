@@ -3,6 +3,7 @@ const path = require('path');
 const { PythonShell } = require('python-shell');
 const fs = require('fs');
 const os = require('os');
+const config = require('./config');
 
 // Cache for checking if Python scripts exist
 const scriptExistsCache = {};
@@ -67,7 +68,7 @@ async function checkPythonEnvironment() {
                       librosaResult.output && 
                       librosaResult.output.includes('ok');
     
-    console.log(`Librosa available: ${pythonHasLibrosa}`);
+    console.log(`Librosa available: ${pythonHasLibrosa ? 'Yes' : 'No'}`);
   } catch (err) {
     console.error('Error checking for librosa:', err);
   }
@@ -86,7 +87,7 @@ async function checkPythonEnvironment() {
                         spleeterResult.output && 
                         spleeterResult.output.includes('ok');
     
-    console.log(`Spleeter available: ${pythonHasSpleeter}`);
+    console.log(`Spleeter available: ${pythonHasSpleeter ? 'Yes' : 'No'}`);
   } catch (err) {
     console.error('Error checking for spleeter:', err);
   }
@@ -121,6 +122,35 @@ function checkScriptExists(scriptPath) {
 }
 
 /**
+ * Get absolute path to Python script directory
+ * @returns {string} Absolute path to Python scripts
+ */
+function getPythonScriptDir() {
+  // First check the configured script directory
+  const configuredDir = config.python.scriptDir;
+  if (fs.existsSync(configuredDir)) {
+    return configuredDir;
+  }
+  
+  // Fallback to default locations
+  const possiblePaths = [
+    path.join(__dirname, 'python'),
+    path.join(process.cwd(), 'src', 'server', 'python'),
+    path.join(process.cwd(), 'server', 'python')
+  ];
+  
+  for (const dir of possiblePaths) {
+    if (fs.existsSync(dir)) {
+      return dir;
+    }
+  }
+  
+  // Last resort - return the default and log error
+  console.error('Could not find Python script directory, using default');
+  return path.join(__dirname, 'python');
+}
+
+/**
  * Run a Python script with proper error handling
  * @param {string} scriptName Name of the Python script (without path)
  * @param {string[]} args Arguments to pass to the script
@@ -134,10 +164,11 @@ async function runPythonScript(scriptName, args = [], options = {}) {
   }
   
   return new Promise((resolve, reject) => {
-    const scriptPath = path.join(__dirname, 'python', scriptName);
+    const scriptDir = getPythonScriptDir();
+    const scriptPath = path.join(scriptDir, scriptName);
     
     if (!checkScriptExists(scriptPath)) {
-      return reject(new Error(`Python script not found: ${scriptName}`));
+      return reject(new Error(`Python script not found: ${scriptName} (looked in ${scriptDir})`));
     }
     
     // Determine memory constraint for Python
@@ -152,12 +183,21 @@ async function runPythonScript(scriptName, args = [], options = {}) {
       memoryFlag = ['-Xmx1024m'];
     }
     
+    // Set up environment variables for Python
+    const env = { ...process.env };
+    
+    // Pass system resources info to Python
+    env.SYSTEM_MEMORY_MB = String(totalMemoryMB);
+    env.AVAILABLE_MEMORY_MB = String(availableMemoryMB);
+    env.CPU_COUNT = String(os.cpus().length);
+    
     const defaultOptions = {
       mode: 'text',
       pythonPath: pythonPath,
       pythonOptions: ['-u', ...memoryFlag], // unbuffered output + memory limit
-      scriptPath: path.join(__dirname, 'python'),
-      args: args
+      scriptPath: scriptDir,
+      args: args,
+      env: env
     };
     
     const mergedOptions = { ...defaultOptions, ...options };
@@ -166,6 +206,8 @@ async function runPythonScript(scriptName, args = [], options = {}) {
     if (availableMemoryMB < 1024) {
       mergedOptions.timeout = 180000; // 3 minutes timeout
     }
+    
+    console.log(`Running Python script: ${scriptName} with args: ${args.join(' ')}`);
     
     PythonShell.run(scriptName, mergedOptions, (err, results) => {
       if (err) {
@@ -209,10 +251,11 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
   }
   
   return new Promise((resolve, reject) => {
-    const scriptPath = path.join(__dirname, 'python', scriptName);
+    const scriptDir = getPythonScriptDir();
+    const scriptPath = path.join(scriptDir, scriptName);
     
     if (!checkScriptExists(scriptPath)) {
-      return reject(new Error(`Python script not found: ${scriptName}`));
+      return reject(new Error(`Python script not found: ${scriptName} (looked in ${scriptDir})`));
     }
     
     // Determine memory constraint for Python
@@ -226,12 +269,21 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
       memoryFlag = ['-Xmx1024m'];
     }
     
+    // Set up environment variables for Python
+    const env = { ...process.env };
+    
+    // Pass system resources info to Python
+    env.SYSTEM_MEMORY_MB = String(totalMemoryMB);
+    env.AVAILABLE_MEMORY_MB = String(availableMemoryMB);
+    env.CPU_COUNT = String(os.cpus().length);
+    
     const defaultOptions = {
       mode: 'text',
       pythonPath: pythonPath,
       pythonOptions: ['-u', ...memoryFlag], // unbuffered output + memory limit 
-      scriptPath: path.join(__dirname, 'python'),
-      args: args
+      scriptPath: scriptDir,
+      args: args,
+      env: env
     };
     
     const mergedOptions = { ...defaultOptions, ...options };
@@ -240,6 +292,8 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
     if (availableMemoryMB < 1024) {
       mergedOptions.timeout = 300000; // 5 minutes timeout
     }
+    
+    console.log(`Running Python script with progress: ${scriptName} with args: ${args.join(' ')}`);
     
     // Create PythonShell instance for interaction
     const pyshell = new PythonShell(scriptName, mergedOptions);
@@ -250,11 +304,20 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
     pyshell.on('message', (message) => {
       // Check if it's a progress update
       if (message.startsWith('PROGRESS:') && onProgress) {
-        const progressValue = parseFloat(message.replace('PROGRESS:', '').trim());
-        onProgress(progressValue);
+        try {
+          const progressValue = parseFloat(message.replace('PROGRESS:', '').trim());
+          onProgress(progressValue);
+        } catch (e) {
+          console.warn('Invalid progress format:', message);
+        }
       } else {
         results.push(message);
       }
+    });
+    
+    pyshell.on('stderr', (err) => {
+      // Log stderr output but don't fail the process
+      console.warn(`[Python ${scriptName}]:`, err);
     });
     
     pyshell.on('error', (err) => {
@@ -262,7 +325,11 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
       reject(err);
     });
     
-    pyshell.on('close', () => {
+    pyshell.on('close', (exitCode) => {
+      if (exitCode !== 0 && exitCode !== null) {
+        console.warn(`Python script ${scriptName} exited with code: ${exitCode}`);
+      }
+      
       try {
         // Try to parse the last result as JSON
         if (results.length > 0) {
@@ -287,5 +354,6 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
 module.exports = {
   runPythonScript,
   runPythonScriptWithProgress,
-  checkPythonEnvironment
+  checkPythonEnvironment,
+  getPythonScriptDir
 };
