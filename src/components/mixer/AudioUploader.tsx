@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Music2, X, Loader2 } from 'lucide-react';
@@ -142,12 +141,24 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
         fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB` 
       });
       
+      // Simulate progress steps for better UX since we can't track real progress
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          const next = prev + 15;
+          return next < 90 ? next : prev;
+        });
+      }, 500);
+      
       // Use the improved upload function
       const result = await uploadFileToBucket(
         file, 
         filePath, 
         (progress) => setProgress(progress)
       );
+      
+      // Clear interval and set progress to 100%
+      clearInterval(progressInterval);
+      setProgress(100);
       
       console.log(`AudioUploader ${trackNumber}: Upload completed`, result);
       
@@ -183,6 +194,8 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
       });
     } finally {
       setUploading(false);
+      
+      // Reset progress after a brief delay
       setTimeout(() => {
         setProgress(0);
       }, 1000);
