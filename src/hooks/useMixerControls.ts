@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useAudioAnalysis } from './useAudioAnalysis';
 import { usePromptProcessing } from './usePromptProcessing';
 import { useMixingEngine } from './useMixingEngine';
+import { getInstructionInsights } from '@/utils/ai-prompt-analysis';
 
 interface UseMixerControlsProps {
   track1Url: string | undefined;
@@ -52,7 +53,6 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     promptProcessProgress,
     promptAnalysisResult,
     handlePromptMix,
-    getInstructionInsights
   } = usePromptProcessing({
     track1Features,
     track2Features,
@@ -103,7 +103,7 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     isProcessingPrompt,
     promptProcessProgress,
     promptAnalysisResult,
-    getInstructionInsights,
+    getInstructionInsights: () => getInstructionInsights(promptAnalysisResult),
     
     // Mix settings
     mixSettings,
