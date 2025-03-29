@@ -1,9 +1,8 @@
-
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const { nanoid } = require('nanoid');
-const { separateTracks } = require('./audioProcessor');
+const { separateTracks } = require('./audio');
 
 /**
  * Mix two audio tracks together based on provided settings
