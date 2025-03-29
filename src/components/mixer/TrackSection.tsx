@@ -5,10 +5,20 @@ import { AudioUploader } from './AudioUploader';
 import { TrackAnalysis } from './TrackAnalysis';
 import WaveSurfer from 'wavesurfer.js';
 
+interface AudioFeatures {
+  bpm: number;
+  key: string;
+  energy: number;
+  clarity: number;
+}
+
 interface TrackSectionProps {
   trackNumber: 1 | 2;
   trackUrl: string | undefined;
   trackName: string | undefined;
+  audioFeatures: AudioFeatures | null;
+  isAnalyzing: boolean;
+  analyzeProgress: number;
   onUploadComplete: (url: string, fileName: string) => void;
   onWavesurferReady: (wavesurfer: WaveSurfer) => void;
 }
@@ -17,32 +27,17 @@ export const TrackSection: React.FC<TrackSectionProps> = ({
   trackNumber,
   trackUrl,
   trackName,
+  audioFeatures,
+  isAnalyzing,
+  analyzeProgress,
   onUploadComplete,
   onWavesurferReady,
 }) => {
-  // Mock track analysis state (would be populated by backend)
-  const [trackAnalysis, setTrackAnalysis] = useState({
-    isLoading: false,
-    genre: trackNumber === 1 ? 'Pop' : 'Electronic',
-    bpm: trackNumber === 1 ? 120 : 128,
-    key: trackNumber === 1 ? 'C Major' : 'A Minor',
-    duration: trackNumber === 1 ? 180 : 210,
-  });
+  // Mock duration state
+  const [trackDuration, setTrackDuration] = useState(trackNumber === 1 ? 180 : 210);
 
   const handleUpload = (url: string, fileName: string) => {
     onUploadComplete(url, fileName);
-    setTrackAnalysis(prev => ({ ...prev, isLoading: true }));
-    
-    // Simulate analysis
-    setTimeout(() => {
-      setTrackAnalysis({
-        isLoading: false,
-        genre: trackNumber === 1 ? 'Pop' : 'Electronic',
-        bpm: trackNumber === 1 ? 120 : 128,
-        key: trackNumber === 1 ? 'C Major' : 'A Minor',
-        duration: trackNumber === 1 ? 180 : 210,
-      });
-    }, 3000);
   };
 
   return (
@@ -63,11 +58,10 @@ export const TrackSection: React.FC<TrackSectionProps> = ({
           
           <TrackAnalysis
             trackName={trackName || `Track ${trackNumber}`}
-            isLoading={trackAnalysis.isLoading}
-            genre={trackAnalysis.genre}
-            bpm={trackAnalysis.bpm}
-            key={trackAnalysis.key}
-            duration={trackAnalysis.duration}
+            isLoading={isAnalyzing}
+            features={audioFeatures}
+            duration={trackDuration}
+            analyzingProgress={analyzeProgress}
           />
         </>
       )}

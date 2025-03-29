@@ -27,6 +27,12 @@ const Mixer: React.FC = () => {
     isPlaying,
     volume,
     setVolume,
+    track1Features,
+    track2Features,
+    isAnalyzing,
+    analyzeProgress,
+    mixSettings,
+    updateMixSetting,
     handleMix,
     togglePlayback,
     restartPlayback,
@@ -73,6 +79,9 @@ const Mixer: React.FC = () => {
             trackNumber={1}
             trackUrl={track1Url}
             trackName={track1Name}
+            audioFeatures={track1Features}
+            isAnalyzing={isAnalyzing && !track1Features}
+            analyzeProgress={analyzeProgress}
             onUploadComplete={handleTrack1Upload}
             onWavesurferReady={handleTrack1WavesurferReady}
           />
@@ -82,6 +91,9 @@ const Mixer: React.FC = () => {
             trackNumber={2}
             trackUrl={track2Url}
             trackName={track2Name}
+            audioFeatures={track2Features}
+            isAnalyzing={isAnalyzing && !track2Features}
+            analyzeProgress={analyzeProgress}
             onUploadComplete={handleTrack2Upload}
             onWavesurferReady={handleTrack2WavesurferReady}
           />
@@ -98,6 +110,10 @@ const Mixer: React.FC = () => {
             isPlaying={isPlaying}
             volume={volume}
             setVolume={setVolume}
+            track1Features={track1Features}
+            track2Features={track2Features}
+            mixSettings={mixSettings}
+            updateMixSetting={updateMixSetting}
             handleMix={handleMix}
             togglePlayback={togglePlayback}
             restartPlayback={restartPlayback}
