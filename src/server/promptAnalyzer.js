@@ -27,6 +27,12 @@ async function analyzePrompt(prompt, track1Features, track2Features) {
   } catch (error) {
     console.error('Prompt analysis error:', error);
     
+    // Log more detailed error information
+    if (error.response) {
+      console.error('Error response data:', error.response.data);
+      console.error('Error response status:', error.response.status);
+    }
+    
     // Fallback to default analysis if AI analysis fails
     return createDefaultAnalysis(track1Features, track2Features);
   }
@@ -83,6 +89,8 @@ Understand music terminology and extract both explicit and implicit instructions
  */
 async function analyzeWithClaude(systemPrompt, userPrompt) {
   try {
+    console.log('Sending request to Claude API...');
+    
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -107,23 +115,87 @@ async function analyzeWithClaude(systemPrompt, userPrompt) {
       })
     });
 
+    // Check for HTTP errors
     if (!response.ok) {
-      throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      const errorStatus = response.status;
+      console.error(`Claude API HTTP error: ${errorStatus}`);
+      console.error('Error response:', errorText);
+      
+      // Create a detailed error with status code
+      throw new Error(`Claude API error: ${errorStatus} ${response.statusText}\n${errorText}`);
     }
 
     const data = await response.json();
+    console.log('Claude API response received');
+    
+    // Enhanced response validation
+    if (!data || !data.content || !Array.isArray(data.content) || data.content.length === 0) {
+      console.error('Invalid Claude API response structure:', JSON.stringify(data));
+      throw new Error('Claude API returned an invalid response structure');
+    }
     
     try {
-      // Parse the JSON response from Claude
-      const content = data.content[0].text;
-      return JSON.parse(content);
+      // Extract content text with validation
+      const contentItem = data.content[0];
+      if (!contentItem || !contentItem.text) {
+        console.error('Missing text in Claude response:', JSON.stringify(data.content));
+        throw new Error('Missing text content in Claude response');
+      }
+      
+      const content = contentItem.text;
+      console.log('Claude response content:', content.substring(0, 100) + '...');
+      
+      // Look for a valid JSON object in the response text
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error('No JSON object found in Claude response:', content);
+        throw new Error('No JSON object found in Claude response');
+      }
+      
+      const jsonContent = jsonMatch[0];
+      
+      // Parse the JSON with error catching
+      try {
+        const parsedResult = JSON.parse(jsonContent);
+        
+        // Validate the result structure
+        if (!parsedResult.instructions || !Array.isArray(parsedResult.instructions)) {
+          console.error('Missing or invalid instructions in parsed result:', parsedResult);
+          throw new Error('Missing or invalid instructions array in parsed result');
+        }
+        
+        if (!parsedResult.recommendedSettings) {
+          console.error('Missing recommendedSettings in parsed result:', parsedResult);
+          throw new Error('Missing recommendedSettings in parsed result');
+        }
+        
+        // Add a default summary if missing
+        if (!parsedResult.summary) {
+          parsedResult.summary = "AI-generated mix based on your instructions.";
+        }
+        
+        return parsedResult;
+      } catch (jsonError) {
+        console.error('Error parsing JSON from Claude response:', jsonError);
+        console.error('JSON content that failed to parse:', jsonContent);
+        throw new Error(`Failed to parse JSON from Claude response: ${jsonError.message}`);
+      }
     } catch (parseError) {
-      console.error('Error parsing Claude response:', parseError);
-      throw new Error('Failed to parse Claude response');
+      console.error('Error processing Claude response:', parseError);
+      throw new Error(`Failed to process Claude response: ${parseError.message}`);
     }
   } catch (error) {
     console.error('Claude API error:', error);
-    throw error;
+    
+    // Add more context to the error
+    if (error.message.includes('API key')) {
+      throw new Error(`Authentication error: ${error.message}. Please check your API key.`);
+    } else if (error.message.includes('429')) {
+      throw new Error('Rate limit exceeded. Please try again in a few minutes.');
+    } else {
+      throw error; // Propagate the detailed error
+    }
   }
 }
 
@@ -134,6 +206,9 @@ async function analyzeWithClaude(systemPrompt, userPrompt) {
  * @returns {Object} Default analysis
  */
 function createDefaultAnalysis(track1Features, track2Features) {
+  // Log that we're using default analysis
+  console.log('Using default analysis due to AI processing error');
+  
   // Create sensible defaults based on track features
   const shouldMatchBpm = Math.abs(track1Features.bpm - track2Features.bpm) > 5;
   const shouldMatchKey = track1Features.key !== track2Features.key;
@@ -159,7 +234,7 @@ function createDefaultAnalysis(track1Features, track2Features) {
         confidence: 0.8
       }
     ],
-    summary: "Balance both tracks with automatic BPM and key matching for a professional sound.",
+    summary: "Automatic mix with balanced levels and smooth transitions. (AI analysis failed, using default settings.)",
     recommendedSettings: {
       bpmMatch: shouldMatchBpm,
       keyMatch: shouldMatchKey,
