@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import { MixSettingsType } from '@/types/mixer';
-import { AudioFeatures } from '@/types/audio';
+import { AudioFeatures, PrecomputedOperations } from '@/types/audio';
 import { API } from '@/config';
+import { getPrecomputedOps, cachePrecomputedOps } from '@/services/analysis-cache';
+import { isAudioProcessorReady } from '@/services/wasm-audio-processor';
 
 interface UseMixOperationsProps {
   track1Url: string | undefined;
@@ -26,8 +28,43 @@ export const useMixOperations = ({
   const [isMixing, setIsMixing] = useState(false);
   const [mixProgress, setMixProgress] = useState(0);
   const [mixedTrackUrl, setMixedTrackUrl] = useState<string | undefined>();
+  const [precomputedOps, setPrecomputedOps] = useState<{
+    track1: PrecomputedOperations | null;
+    track2: PrecomputedOperations | null;
+  }>({ track1: null, track2: null });
   
   const { toast } = useToast();
+  
+  // Load precomputed operations when tracks change
+  useEffect(() => {
+    if (track1Url && track1Info) {
+      const trackId = track1Info.path;
+      const cached = getPrecomputedOps(trackId);
+      
+      if (cached) {
+        setPrecomputedOps(prev => ({ ...prev, track1: cached }));
+        console.log('Using cached precomputed operations for track 1');
+      } else {
+        // Reset precomputed ops for track 1
+        setPrecomputedOps(prev => ({ ...prev, track1: null }));
+      }
+    }
+  }, [track1Url, track1Info]);
+  
+  useEffect(() => {
+    if (track2Url && track2Info) {
+      const trackId = track2Info.path;
+      const cached = getPrecomputedOps(trackId);
+      
+      if (cached) {
+        setPrecomputedOps(prev => ({ ...prev, track2: cached }));
+        console.log('Using cached precomputed operations for track 2');
+      } else {
+        // Reset precomputed ops for track 2
+        setPrecomputedOps(prev => ({ ...prev, track2: null }));
+      }
+    }
+  }, [track2Url, track2Info]);
   
   // Create mixing steps based on settings
   const createMixingSteps = (
@@ -129,6 +166,55 @@ export const useMixOperations = ({
     }, 3000);
   };
   
+  // Pre-compute operations for a track
+  const precomputeOperations = async (
+    trackUrl: string, 
+    trackInfo: {path: string, name: string},
+    features: AudioFeatures
+  ) => {
+    if (!trackUrl || !trackInfo || !features) return;
+    
+    try {
+      toast({
+        title: "Pre-computing operations",
+        description: `Preparing optimizations for ${trackInfo.name}`,
+      });
+      
+      // Call the backend to pre-compute operations
+      const response = await axios.post(API.endpoints.precompute, {
+        filePath: trackInfo.path,
+        features,
+        useWasm: isAudioProcessorReady()
+      });
+      
+      const precomputed: PrecomputedOperations = response.data.precomputed;
+      
+      // Cache the precomputed operations
+      cachePrecomputedOps(trackInfo.path, precomputed);
+      
+      return precomputed;
+    } catch (error) {
+      console.error("Error pre-computing operations:", error);
+      
+      // Create basic precomputed operations object as fallback
+      const fallbackOps: PrecomputedOperations = {
+        trackId: trackInfo.path,
+        bpmVariants: {},
+        keyVariants: {},
+        stemCache: {
+          vocals: `${trackUrl.split('.')[0]}_vocals.mp3`,
+          instrumental: `${trackUrl.split('.')[0]}_instrumental.mp3`,
+          drums: `${trackUrl.split('.')[0]}_drums.mp3`,
+          bass: `${trackUrl.split('.')[0]}_bass.mp3`
+        },
+        effectVariants: {},
+        cacheTimestamp: Date.now()
+      };
+      
+      return fallbackOps;
+    }
+  };
+  
   const handleMix = async (mixSettings: MixSettingsType, lastPromptAnalysis = null) => {
     if (!track1Url || !track2Url) {
       toast({
@@ -160,6 +246,21 @@ export const useMixOperations = ({
     setIsMixing(true);
     setMixProgress(0);
     
+    // Pre-compute operations if not already cached
+    if (!precomputedOps.track1 && track1Info) {
+      const track1Ops = await precomputeOperations(track1Url, track1Info, track1Features);
+      if (track1Ops) {
+        setPrecomputedOps(prev => ({ ...prev, track1: track1Ops }));
+      }
+    }
+    
+    if (!precomputedOps.track2 && track2Info) {
+      const track2Ops = await precomputeOperations(track2Url, track2Info, track2Features);
+      if (track2Ops) {
+        setPrecomputedOps(prev => ({ ...prev, track2: track2Ops }));
+      }
+    }
+    
     // Check if we have prompt analysis to use
     if (lastPromptAnalysis) {
       console.log("Using prompt analysis for mixing:", lastPromptAnalysis.summary);
@@ -178,7 +279,12 @@ export const useMixOperations = ({
         track1Path: track1Info.path,
         track2Path: track2Info.path,
         settings: mixSettings,
-        outputFileName: `mixed-${Date.now()}.mp3`
+        outputFileName: `mixed-${Date.now()}.mp3`,
+        precomputed: {
+          track1: precomputedOps.track1 ? precomputedOps.track1.trackId : null,
+          track2: precomputedOps.track2 ? precomputedOps.track2.trackId : null
+        },
+        useWasm: isAudioProcessorReady()
       });
       
       // Get the mixed track URL from the response
@@ -215,6 +321,7 @@ export const useMixOperations = ({
     isMixing,
     mixProgress,
     mixedTrackUrl,
-    handleMix
+    handleMix,
+    hasPrecomputedOps: !!(precomputedOps.track1 || precomputedOps.track2)
   };
 };

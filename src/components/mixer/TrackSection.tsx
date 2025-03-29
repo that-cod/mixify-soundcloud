@@ -3,13 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { WaveformDisplay } from './WaveformDisplay';
 import { AudioUploader } from './AudioUploader';
 import { TrackAnalysis } from './TrackAnalysis';
+import { Badge } from '@/components/ui/badge';
 import WaveSurfer from 'wavesurfer.js';
+import { Database, HardDrive } from 'lucide-react';
 
 interface AudioFeatures {
   bpm: number;
   key: string;
   energy: number;
   clarity: number;
+  cached?: boolean;
 }
 
 interface TrackSectionProps {
@@ -42,7 +45,15 @@ export const TrackSection: React.FC<TrackSectionProps> = ({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Track {trackNumber}</h2>
+      <h2 className="text-xl font-semibold flex items-center gap-2">
+        Track {trackNumber}
+        {audioFeatures?.cached && (
+          <Badge variant="outline" className="bg-white/10 text-xs font-normal flex items-center gap-1">
+            <HardDrive className="h-3 w-3" />
+            Cached
+          </Badge>
+        )}
+      </h2>
       <AudioUploader 
         trackNumber={trackNumber} 
         onUploadComplete={handleUpload} 

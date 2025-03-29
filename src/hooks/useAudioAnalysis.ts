@@ -1,23 +1,16 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import { API } from '@/config';
-
-interface AudioFeatures {
-  bpm: number;
-  key: string;
-  energy: number;
-  clarity: number;
-  waveform?: number[];
-  spectrum?: Record<string, number>;
-}
-
-interface SeparatedTracks {
-  vocals: string;
-  instrumental: string;
-  drums: string;
-  bass: string;
-}
+import { AudioFeatures, SeparatedTracks } from '@/types/audio';
+import { 
+  getCachedAnalysis, 
+  cacheAnalysisResults, 
+  getCachedStems, 
+  cacheStemSeparation 
+} from '@/services/analysis-cache';
+import { initWasmAudioProcessor, isAudioProcessorReady } from '@/services/wasm-audio-processor';
 
 export const useAudioAnalysis = () => {
   // Audio analysis states
@@ -27,10 +20,56 @@ export const useAudioAnalysis = () => {
   const [track2Separated, setTrack2Separated] = useState<SeparatedTracks | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState(0);
+  const [wasmInitialized, setWasmInitialized] = useState(false);
   
   const { toast } = useToast();
   
+  // Initialize WebAssembly on component mount
+  useEffect(() => {
+    const initWasm = async () => {
+      const success = await initWasmAudioProcessor();
+      setWasmInitialized(success);
+      
+      if (success) {
+        console.log('WebAssembly audio processor initialized');
+      } else {
+        console.log('Using JavaScript fallback for audio processing');
+      }
+    };
+    
+    initWasm();
+  }, []);
+  
   const analyzeTrack = async (trackUrl: string, trackNumber: 1 | 2) => {
+    // Check cache first
+    const cachedFeatures = getCachedAnalysis(trackUrl);
+    if (cachedFeatures) {
+      console.log(`Using cached analysis for track ${trackNumber}`);
+      
+      if (trackNumber === 1) {
+        setTrack1Features(cachedFeatures);
+      } else {
+        setTrack2Features(cachedFeatures);
+      }
+      
+      toast({
+        title: `Track ${trackNumber} Analysis Loaded`,
+        description: `Loaded cached analysis: BPM: ${cachedFeatures.bpm}, Key: ${cachedFeatures.key}`,
+      });
+      
+      // Check for cached stems
+      const cachedStems = getCachedStems(trackUrl);
+      if (cachedStems) {
+        if (trackNumber === 1) {
+          setTrack1Separated(cachedStems);
+        } else {
+          setTrack2Separated(cachedStems);
+        }
+      }
+      
+      return;
+    }
+    
     setIsAnalyzing(true);
     setAnalyzeProgress(0);
     
@@ -55,7 +94,8 @@ export const useAudioAnalysis = () => {
       // Call the backend to analyze the audio
       const response = await axios.post(API.endpoints.analyze, {
         filePath,
-        trackNumber
+        trackNumber,
+        useWasm: isAudioProcessorReady() // Tell backend if we can use WASM
       });
       
       // Update the analyze progress
@@ -63,6 +103,9 @@ export const useAudioAnalysis = () => {
       
       // Extract features from response
       const features: AudioFeatures = response.data.features;
+      
+      // Cache the analysis results
+      cacheAnalysisResults(trackUrl, features);
       
       // Update the state based on track number
       if (trackNumber === 1) {
@@ -77,21 +120,20 @@ export const useAudioAnalysis = () => {
       });
       
       // For now, we'll skip actual stem separation to simplify
+      const stems = {
+        vocals: `${filePath.split('.')[0]}_vocals.mp3`,
+        instrumental: `${filePath.split('.')[0]}_instrumental.mp3`,
+        drums: `${filePath.split('.')[0]}_drums.mp3`,
+        bass: `${filePath.split('.')[0]}_bass.mp3`
+      };
+      
+      // Cache the stems
+      cacheStemSeparation(trackUrl, stems);
       
       if (trackNumber === 1) {
-        setTrack1Separated({
-          vocals: `${filePath.split('.')[0]}_vocals.mp3`,
-          instrumental: `${filePath.split('.')[0]}_instrumental.mp3`,
-          drums: `${filePath.split('.')[0]}_drums.mp3`,
-          bass: `${filePath.split('.')[0]}_bass.mp3`
-        });
+        setTrack1Separated(stems);
       } else {
-        setTrack2Separated({
-          vocals: `${filePath.split('.')[0]}_vocals.mp3`,
-          instrumental: `${filePath.split('.')[0]}_instrumental.mp3`,
-          drums: `${filePath.split('.')[0]}_drums.mp3`,
-          bass: `${filePath.split('.')[0]}_bass.mp3`
-        });
+        setTrack2Separated(stems);
       }
       
       // Completed
@@ -138,6 +180,9 @@ export const useAudioAnalysis = () => {
       
       const features: AudioFeatures = { bpm, key, energy, clarity };
       
+      // Cache the fallback analysis
+      cacheAnalysisResults(trackUrl, features);
+      
       if (trackNumber === 1) {
         setTrack1Features(features);
         setTrack1Separated({
@@ -172,6 +217,7 @@ export const useAudioAnalysis = () => {
     track2Separated,
     isAnalyzing,
     analyzeProgress,
-    analyzeTrack
+    analyzeTrack,
+    wasmInitialized
   };
 };
