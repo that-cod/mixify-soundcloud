@@ -5,7 +5,7 @@ import axios from 'axios';
 import { MixSettingsType } from '@/types/mixer';
 import { AudioFeatures } from '@/types/audio';
 import { API } from '@/config';
-import { MixingStage, StageStatus, StagedMixSettings } from '@/components/mixer/StagedMixingProcess';
+import { MixingStage, StageStatus, StagedMixSettings } from '@/components/mixer/staged/types';
 
 interface UseStagedMixingProps {
   track1Url: string | undefined;
@@ -96,18 +96,28 @@ export const useStagedMixing = ({
       [setting]: value
     }));
     
+    // Fixed type casting for the parameter name
+    const settingName = setting as string;
+    
     // Show toast when setting is updated
     if (typeof value === 'boolean') {
       toast({
         title: "Setting Updated",
-        description: `${formatSettingName(setting)}: ${value ? 'Enabled' : 'Disabled'}`,
+        description: `${formatSettingName(settingName)}: ${value ? 'Enabled' : 'Disabled'}`,
       });
     } else {
       toast({
         title: "Setting Updated",
-        description: `${formatSettingName(setting)}: ${Math.round(Number(value) * 100)}%`,
+        description: `${formatSettingName(settingName)}: ${Math.round(Number(value) * 100)}%`,
       });
     }
+  };
+  
+  // Helper to format setting names for display
+  const formatSettingName = (setting: string): string => {
+    return setting
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase());
   };
   
   // When a stage is completed
@@ -127,13 +137,6 @@ export const useStagedMixing = ({
       title: "Mix Complete",
       description: "Your tracks have been successfully mixed!",
     });
-  };
-  
-  // Helper to format setting names for display
-  const formatSettingName = (setting: string): string => {
-    return setting
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase());
   };
   
   // Convert staged settings to regular mix settings

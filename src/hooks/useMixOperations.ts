@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
@@ -100,9 +99,9 @@ export const useMixOperations = ({
         key2: track2Features.key,
         // If we have a prompt analysis, include it
         promptAnalysis: promptAnalysis ? {
-          intentions: promptAnalysis.intentions,
-          suggestedSettings: promptAnalysis.suggestedSettings,
-          confidence: promptAnalysis.confidence
+          instructions: promptAnalysis.instructions,
+          summary: promptAnalysis.summary,
+          recommendedSettings: promptAnalysis.recommendedSettings
         } : undefined,
         // Flag to indicate if we should use precomputed operations
         usePrecomputed: !!precomputedOps

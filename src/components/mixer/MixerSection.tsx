@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,8 @@ import { WaveformDisplay } from './WaveformDisplay';
 import { PlaybackControls } from './PlaybackControls';
 import { MixSettings } from './MixSettings';
 import { PromptMixingInterface } from './PromptMixingInterface';
-import { StagedMixingProcess, StagedMixSettings } from './StagedMixingProcess';
+import { StagedMixingProcess } from './StagedMixingProcess';
+import { StagedMixSettings } from './staged/types';
 import WaveSurfer from 'wavesurfer.js';
 import { useToast } from '@/hooks/use-toast';
 import { PromptAnalysisResult } from '@/services/anthropic-service';
