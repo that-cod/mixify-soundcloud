@@ -4,8 +4,10 @@
  * Re-exports all functionality from specialized modules
  */
 
-const { mixTracks } = require('./mixer');
+const { mixTracks } = require('./mixerCore');
+const { convertWavToMp3 } = require('./mixerUtils');
 
 module.exports = {
-  mixTracks
+  mixTracks,
+  convertWavToMp3
 };
