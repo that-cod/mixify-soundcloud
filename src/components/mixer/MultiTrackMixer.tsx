@@ -18,7 +18,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { useMultiTrackMixer } from '@/hooks/useMultiTrackMixer';
-import { MixTrack, AudioFeatures } from '@/types/audio';
+import { MixTrack, AudioFeatures, AudioEffects } from '@/types/audio';
 import { WaveformDisplay } from './WaveformDisplay';
 import { AudioUploader } from './AudioUploader';
 import { TrackAnalysis } from './TrackAnalysis';
@@ -181,7 +181,7 @@ export const MultiTrackMixer: React.FC = () => {
   };
   
   // Handle effect updates - this function adapts the component interface to our hook interface
-  const handleUpdateEffect = (trackId: string, effectType: keyof AudioFeatures["effects"], settings: any) => {
+  const handleUpdateEffect = (trackId: string, effectType: keyof AudioEffects, settings: Partial<AudioEffects[keyof AudioEffects]>) => {
     updateTrackEffect(trackId, effectType, settings);
   };
   
