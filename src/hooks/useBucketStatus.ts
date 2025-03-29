@@ -14,6 +14,19 @@ export const useBucketStatus = () => {
         console.log("Verifying storage bucket status...");
         setStorageBucketChecking(true);
         const status = await checkBucketStatus();
+        console.log("Bucket status check result:", status);
+        
+        // If we can successfully upload, consider the bucket functional
+        // regardless of other checks
+        if (status.canUpload) {
+          console.log("Upload capability detected, setting bucket as functional");
+          setBucketStatus({
+            ...status,
+            exists: true // Override exists flag if we can upload
+          });
+          return;
+        }
+        
         setBucketStatus(status);
         
         if (!status.exists) {

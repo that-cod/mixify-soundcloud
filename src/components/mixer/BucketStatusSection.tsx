@@ -13,6 +13,7 @@ export const BucketStatusSection: React.FC<BucketStatusSectionProps> = ({
   bucketStatus,
   storageBucketChecking,
 }) => {
+  // When checking bucket status, show loading indicator
   if (storageBucketChecking) {
     return (
       <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-lg">
@@ -24,7 +25,13 @@ export const BucketStatusSection: React.FC<BucketStatusSectionProps> = ({
     );
   }
 
-  if (!storageBucketChecking && bucketStatus && !bucketStatus.exists) {
+  // Check for critical conditions: if bucket status is null or canUpload is true, don't show warnings
+  if (!bucketStatus || bucketStatus.canUpload) {
+    return null;
+  }
+
+  // At this point, we only show warnings if there are actual problems
+  if (bucketStatus && !bucketStatus.exists) {
     return (
       <div className="mb-6 p-4 border border-yellow-500/50 bg-yellow-500/10 rounded-lg">
         <div className="flex items-start">
@@ -40,7 +47,7 @@ export const BucketStatusSection: React.FC<BucketStatusSectionProps> = ({
     );
   }
 
-  if (!storageBucketChecking && bucketStatus && bucketStatus.exists && !bucketStatus.canUpload) {
+  if (bucketStatus && bucketStatus.exists && !bucketStatus.canUpload) {
     return (
       <div className="mb-6 p-4 border border-yellow-500/50 bg-yellow-500/10 rounded-lg">
         <div className="flex items-start">
