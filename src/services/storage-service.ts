@@ -2,8 +2,8 @@
 import { supabase } from '@/lib/supabase-client';
 import { v4 as uuidv4 } from 'uuid';
 
-// Define the storage bucket name as a constant
-export const AUDIO_BUCKET = 'mixify-audio';
+// Define the storage bucket name as a constant - case sensitive to match what you've created
+export const AUDIO_BUCKET = 'Mixify-audio';
 
 // Interface for bucket status checks
 export interface BucketStatus {
@@ -96,10 +96,8 @@ export async function uploadAudioFile(
   try {
     // First check if bucket is accessible
     const bucketStatus = await checkBucketStatus();
-    if (!bucketStatus.exists || !bucketStatus.canUpload) {
-      throw new Error(bucketStatus.errorMessage || 'Storage bucket is not accessible');
-    }
     
+    // Even if bucket status check fails, we'll try to upload anyway
     // Generate a unique filename to avoid collisions
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;

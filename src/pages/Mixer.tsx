@@ -70,22 +70,22 @@ const Mixer: React.FC = () => {
         if (!status.exists) {
           console.error(`Bucket "${AUDIO_BUCKET}" doesn't exist`);
           toast({
-            title: "Storage Not Available",
-            description: status.errorMessage || `Bucket "${AUDIO_BUCKET}" doesn't exist in your Supabase project.`,
-            variant: "destructive",
+            title: "Storage Notice",
+            description: `Bucket "${AUDIO_BUCKET}" not found. You can still try uploading.`,
+            variant: "warning",
           });
         } else if (!status.canUpload) {
           console.error(`Cannot upload to bucket "${AUDIO_BUCKET}"`);
           toast({
-            title: "Upload Permission Issue",
-            description: status.errorMessage || "You don't have permission to upload to this bucket.",
-            variant: "destructive",
+            title: "Permission Notice",
+            description: "Permission issues detected, but you can still try uploading.",
+            variant: "warning",
           });
         } else if (!status.isPublic) {
           console.warn(`Bucket "${AUDIO_BUCKET}" is not public`);
           toast({
-            title: "Storage Warning", 
-            description: "The storage bucket is not set to public. Your uploaded files might not be accessible.",
+            title: "Storage Notice", 
+            description: "The storage bucket is not set to public. Your files might not be accessible.",
             variant: "warning",
           });
         } else {
@@ -100,9 +100,9 @@ const Mixer: React.FC = () => {
           errorMessage: err.message || 'Unknown error checking storage bucket'
         });
         toast({
-          title: "Storage Error",
-          description: "Could not verify storage bucket status.",
-          variant: "destructive",
+          title: "Storage Notice",
+          description: "Could not verify storage bucket. You can still try uploading.",
+          variant: "warning",
         });
       } finally {
         setStorageBucketChecking(false);
@@ -244,13 +244,13 @@ const Mixer: React.FC = () => {
         )}
         
         {!storageBucketChecking && bucketStatus && !bucketStatus.exists && (
-          <div className="mb-6 p-4 border border-red-500/50 bg-red-500/10 rounded-lg">
+          <div className="mb-6 p-4 border border-yellow-500/50 bg-yellow-500/10 rounded-lg">
             <div className="flex items-start">
-              <AlertCircle className="h-5 w-5 text-red-400 mr-2 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
               <div>
-                <h3 className="text-md text-red-400 font-medium">Storage Not Available</h3>
-                <p className="text-sm text-red-300/80">
-                  {bucketStatus.errorMessage || `The storage bucket "${AUDIO_BUCKET}" does not exist. Please create it in your Supabase project with public access enabled.`}
+                <h3 className="text-md text-yellow-400 font-medium">Storage Notice</h3>
+                <p className="text-sm text-yellow-300/80">
+                  {bucketStatus.errorMessage || `The storage bucket "${AUDIO_BUCKET}" was not found. You can still try uploading.`}
                 </p>
               </div>
             </div>
@@ -262,9 +262,9 @@ const Mixer: React.FC = () => {
             <div className="flex items-start">
               <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
               <div>
-                <h3 className="text-md text-yellow-400 font-medium">Upload Permission Issue</h3>
+                <h3 className="text-md text-yellow-400 font-medium">Permission Notice</h3>
                 <p className="text-sm text-yellow-300/80">
-                  {bucketStatus.errorMessage || `You don't have permission to upload to the storage bucket. Check your Supabase RLS policies.`}
+                  {bucketStatus.errorMessage || `Permission issues detected. You can still try uploading.`}
                 </p>
               </div>
             </div>
@@ -359,7 +359,7 @@ const Mixer: React.FC = () => {
                     </p>
                     <Button 
                       onClick={handleMix} 
-                      disabled={!track1Url || !track2Url || !bucketStatus?.canUpload}
+                      disabled={!track1Url || !track2Url}
                       className="bg-mixify-purple hover:bg-mixify-purple-dark"
                     >
                       <MicIcon className="mr-2 h-5 w-5" />
