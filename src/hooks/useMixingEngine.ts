@@ -1,8 +1,9 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { matchBPM, harmonicMixing } from '@/utils/audioAnalysis';
 import WaveSurfer from 'wavesurfer.js';
+import { PromptAnalysisResult, MixingInstruction } from '@/services/anthropic-service';
 
 interface AudioFeatures {
   bpm: number;
@@ -65,6 +66,9 @@ export const useMixingEngine = ({
   const wavesurfer2Ref = { current: null as WaveSurfer | null };
   const mixedWavesurferRef = { current: null as WaveSurfer | null };
   
+  // Last prompt analysis results
+  const [lastPromptAnalysis, setLastPromptAnalysis] = useState<PromptAnalysisResult | null>(null);
+  
   const updateMixSetting = (setting: keyof MixSettingsType, value: number | boolean) => {
     setMixSettings(prev => ({
       ...prev,
@@ -74,6 +78,29 @@ export const useMixingEngine = ({
 
   const updateMixSettings = (newSettings: MixSettingsType) => {
     setMixSettings(newSettings);
+    // Log the updated settings for debugging
+    console.log("Mix settings updated:", newSettings);
+  };
+  
+  // Apply specific mixing instructions from prompt analysis
+  const applyPromptInstructions = (promptAnalysis: PromptAnalysisResult) => {
+    setLastPromptAnalysis(promptAnalysis);
+    
+    // First apply the recommended settings
+    updateMixSettings(promptAnalysis.recommendedSettings);
+    
+    // Then process any additional instructions that weren't directly mapped to settings
+    const specialInstructions = promptAnalysis.instructions.filter(
+      instruction => instruction.confidence > 0.7
+    );
+    
+    console.log("Applying special mixing instructions:", specialInstructions);
+    
+    // Log the processing plan based on the prompt analysis
+    toast({
+      title: "Mixing Plan Created",
+      description: promptAnalysis.summary,
+    });
   };
   
   const handleMix = () => {
@@ -97,31 +124,41 @@ export const useMixingEngine = ({
     
     setIsMixing(true);
     
-    // Check if BPM matching is needed
-    if (mixSettings.bpmMatch && track1Features.bpm !== track2Features.bpm) {
+    // Check if we have prompt analysis to use
+    if (lastPromptAnalysis) {
+      console.log("Using prompt analysis for mixing:", lastPromptAnalysis.summary);
+      toast({
+        title: "AI-Guided Mix",
+        description: `Creating mix based on your instructions: ${lastPromptAnalysis.summary.substring(0, 100)}${lastPromptAnalysis.summary.length > 100 ? '...' : ''}`,
+      });
+    }
+    
+    // Apply mix settings based on track features and current settings
+    let appliedSettings = { ...mixSettings };
+    
+    // Adjust settings based on track features
+    if (appliedSettings.bpmMatch && track1Features.bpm !== track2Features.bpm) {
       console.log(`Matching BPM: ${track1Features.bpm} → ${track2Features.bpm}`);
+      // In a real implementation, we would calculate the BPM adjustment factor
     }
     
     // Check if keys are harmonic
-    if (mixSettings.keyMatch) {
+    if (appliedSettings.keyMatch) {
       const areHarmonic = harmonicMixing(track1Features.key, track2Features.key);
       if (!areHarmonic) {
         console.log(`Keys not harmonic: ${track1Features.key} and ${track2Features.key}`);
+        toast({
+          title: "Key Adjustment",
+          description: `Harmonizing keys: ${track1Features.key} and ${track2Features.key}`,
+        });
       }
     }
     
+    // Create descriptive steps based on actual settings
+    const steps = createMixingSteps(appliedSettings, track1Features, track2Features);
+    
     // Simulate mixing process with detailed steps
     let progress = 0;
-    const steps = [
-      "Preparing tracks...",
-      "Matching tempos...",
-      "Aligning beats...",
-      "Adjusting EQ levels...",
-      "Applying vocal processing...",
-      "Creating transitions...",
-      "Finalizing mix...",
-    ];
-    
     let currentStep = 0;
     const interval = setInterval(() => {
       progress += 5;
@@ -140,23 +177,81 @@ export const useMixingEngine = ({
         clearInterval(interval);
         setIsMixing(false);
         // In a real implementation, we would use both tracks to create a mix
-        // For now, we'll simulate by using both tracks sequentially
         if (track1Url && track2Url) {
-          createSimulatedMix(track1Url, track2Url);
+          createMixWithSettings(track1Url, track2Url, appliedSettings);
         }
         
         toast({
           title: "Mix complete",
-          description: "Your tracks have been successfully mixed!",
+          description: lastPromptAnalysis 
+            ? "Your AI-guided mix is ready!" 
+            : "Your tracks have been successfully mixed!",
         });
       }
     }, 500);
   };
   
-  // Simulate creating an actual mix of the two tracks
-  const createSimulatedMix = (track1: string, track2: string) => {
-    console.log(`Creating simulated mix of ${track1} and ${track2}`);
-    console.log("Using mix settings:", mixSettings);
+  // Helper function to create descriptive mixing steps based on settings
+  const createMixingSteps = (
+    settings: MixSettingsType, 
+    track1: AudioFeatures | null, 
+    track2: AudioFeatures | null
+  ): string[] => {
+    const steps = ["Preparing tracks..."];
+    
+    if (settings.bpmMatch && track1 && track2 && track1.bpm !== track2.bpm) {
+      steps.push(`Matching tempos (${track1.bpm} → ${track2.bpm} BPM)...`);
+    }
+    
+    if (settings.keyMatch && track1 && track2 && track1.key !== track2.key) {
+      steps.push(`Harmonizing keys (${track1.key} & ${track2.key})...`);
+    }
+    
+    // Add steps based on vocal levels
+    if (settings.vocalLevel1 > 0.7 && settings.vocalLevel2 < 0.5) {
+      steps.push("Emphasizing vocals from track 1...");
+    } else if (settings.vocalLevel2 > 0.7 && settings.vocalLevel1 < 0.5) {
+      steps.push("Emphasizing vocals from track 2...");
+    } else if (settings.vocalLevel1 > 0.6 && settings.vocalLevel2 > 0.6) {
+      steps.push("Balancing vocals from both tracks...");
+    }
+    
+    // Add steps based on beat levels
+    if (settings.beatLevel1 > 0.7 && settings.beatLevel2 < 0.5) {
+      steps.push("Emphasizing beats from track 1...");
+    } else if (settings.beatLevel2 > 0.7 && settings.beatLevel1 < 0.5) {
+      steps.push("Emphasizing beats from track 2...");
+    } else if (settings.beatLevel1 > 0.6 && settings.beatLevel2 > 0.6) {
+      steps.push("Balancing beats from both tracks...");
+    }
+    
+    // Add steps for effects
+    if (settings.echo > 0.5) {
+      steps.push("Applying echo effect...");
+    }
+    
+    if (settings.tempo !== 0) {
+      const direction = settings.tempo > 0 ? "Increasing" : "Decreasing";
+      steps.push(`${direction} overall tempo by ${Math.abs(settings.tempo * 100)}%...`);
+    }
+    
+    if (settings.crossfadeLength > 10) {
+      steps.push(`Creating long crossfade (${settings.crossfadeLength}s)...`);
+    } else if (settings.crossfadeLength > 5) {
+      steps.push(`Creating medium crossfade (${settings.crossfadeLength}s)...`);
+    } else {
+      steps.push(`Creating short crossfade (${settings.crossfadeLength}s)...`);
+    }
+    
+    steps.push("Finalizing mix...");
+    
+    return steps;
+  };
+  
+  // Create a mix with the specified settings
+  const createMixWithSettings = (track1: string, track2: string, settings: MixSettingsType) => {
+    console.log(`Creating mix of ${track1} and ${track2}`);
+    console.log("Using mix settings:", settings);
     
     // In a real implementation, this would create an actual mix of the two audio files
     // For this demo, we'll combine the tracks in a simple concatenation
@@ -167,7 +262,7 @@ export const useMixingEngine = ({
     
     // In a real implementation, we might do something like:
     // const combinedTrackUrl = await audioProcessingService.combineAudioTracks(
-    //   track1, track2, mixSettings
+    //   track1, track2, settings
     // );
     // setMixedTrackUrl(combinedTrackUrl);
   };
@@ -227,5 +322,8 @@ export const useMixingEngine = ({
     handleTrack1WavesurferReady,
     handleTrack2WavesurferReady,
     handleMixedWavesurferReady,
+    
+    // Prompt-related methods
+    applyPromptInstructions,
   };
 };

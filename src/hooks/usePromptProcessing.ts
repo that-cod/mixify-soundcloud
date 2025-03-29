@@ -14,12 +14,14 @@ interface UsePromptProcessingProps {
   track1Features: AudioFeatures | null;
   track2Features: AudioFeatures | null;
   updateMixSettings: (settings: any) => void;
+  applyPromptInstructions?: (analysis: PromptAnalysisResult) => void;
 }
 
 export const usePromptProcessing = ({ 
   track1Features, 
   track2Features,
-  updateMixSettings
+  updateMixSettings,
+  applyPromptInstructions
 }: UsePromptProcessingProps) => {
   // Prompt processing states
   const [isProcessingPrompt, setIsProcessingPrompt] = useState(false);
@@ -81,6 +83,14 @@ export const usePromptProcessing = ({
       // Apply the AI-suggested settings
       updateMixSettings(analysisResult.recommendedSettings);
       
+      // If additional instruction processing is available, use it
+      if (applyPromptInstructions) {
+        applyPromptInstructions(analysisResult);
+      }
+      
+      // Log the instructions received from the analysis
+      console.log("Prompt analysis instructions:", analysisResult.instructions);
+      
       // Display the results to the user
       toast({
         title: "Analysis Complete",
@@ -105,10 +115,30 @@ export const usePromptProcessing = ({
     }
   };
 
+  // Analyze instructions for debugging and insights
+  const getInstructionInsights = () => {
+    if (!promptAnalysisResult || !promptAnalysisResult.instructions) {
+      return null;
+    }
+    
+    // Group instructions by type
+    const instructionsByType = promptAnalysisResult.instructions.reduce((acc, instruction) => {
+      const type = instruction.type;
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(instruction);
+      return acc;
+    }, {} as Record<string, any[]>);
+    
+    return instructionsByType;
+  };
+
   return {
     isProcessingPrompt,
     promptProcessProgress,
     promptAnalysisResult,
-    handlePromptMix
+    handlePromptMix,
+    getInstructionInsights
   };
 };

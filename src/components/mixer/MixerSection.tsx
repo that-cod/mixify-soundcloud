@@ -9,6 +9,7 @@ import { MixSettings } from './MixSettings';
 import { PromptMixingInterface } from './PromptMixingInterface';
 import WaveSurfer from 'wavesurfer.js';
 import { useToast } from '@/hooks/use-toast';
+import { PromptAnalysisResult } from '@/services/anthropic-service';
 
 interface AudioFeatures {
   bpm: number;
@@ -48,6 +49,7 @@ interface MixerSectionProps {
   onMixedWavesurferReady: (wavesurfer: WaveSurfer) => void;
   isProcessingPrompt: boolean;
   promptProcessProgress: number;
+  promptAnalysisResult?: PromptAnalysisResult | null;
   handlePromptMix: (prompt: string) => void;
 }
 
@@ -72,6 +74,7 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
   onMixedWavesurferReady,
   isProcessingPrompt,
   promptProcessProgress,
+  promptAnalysisResult,
   handlePromptMix,
 }) => {
   const [mixMode, setMixMode] = useState<'manual' | 'prompt'>('manual');
@@ -104,7 +107,21 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
     handlePromptMix(prompt);
   };
 
-  const getApiKey = () => apiKey;
+  // If we return to the mixer screen from the completed mix, reset the mix mode
+  const handleCreateNewMix = () => {
+    setMixMode('manual');
+  };
+
+  // Handle the Apply and Mix button clicked in the PromptMixingInterface
+  const handleApplyAndMix = () => {
+    if (promptAnalysisResult) {
+      toast({
+        title: "Applying AI Suggestions",
+        description: "Creating mix based on your instructions...",
+      });
+      handleMix();
+    }
+  };
 
   if (mixedTrackUrl) {
     return (
@@ -127,7 +144,7 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
         />
 
         <Button 
-          onClick={() => setMixMode('manual')}
+          onClick={handleCreateNewMix}
           variant="outline"
           className="mt-4"
         >
@@ -217,17 +234,21 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
           track2Features={track2Features}
           track1Name={track1Name}
           track2Name={track2Name}
+          promptAnalysisResult={promptAnalysisResult}
           onPromptSubmit={handlePromptSubmit}
+          onApplyAndMix={handleApplyAndMix}
           hasApiKey={!!apiKey}
         />
       )}
     
-      {mixMode === 'manual' && (
+      {(mixMode === 'manual' || (mixMode === 'prompt' && promptAnalysisResult)) && (
         <Card className="glass-card">
           <CardHeader>
             <CardTitle>Create Mix</CardTitle>
             <CardDescription>
-              Mix your two tracks with AI assistance
+              {promptAnalysisResult 
+                ? "Apply AI-suggested settings and create your mix" 
+                : "Mix your two tracks with the current settings"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -246,7 +267,9 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
             ) : (
               <div className="flex flex-col items-center py-4">
                 <p className="text-white/70 mb-4">
-                  Ready to mix your tracks? Our AI will analyze both tracks and create a professional mix.
+                  {promptAnalysisResult
+                    ? "Ready to create your AI-guided mix using your instructions."
+                    : "Ready to mix your tracks? Our AI will analyze both tracks and create a professional mix."}
                 </p>
                 <Button 
                   onClick={handleMix} 
@@ -254,7 +277,7 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
                   className="bg-mixify-purple hover:bg-mixify-purple-dark"
                 >
                   <MicIcon className="mr-2 h-5 w-5" />
-                  Mix Tracks
+                  {promptAnalysisResult ? "Create AI Mix" : "Mix Tracks"}
                 </Button>
                 {(!track1Features || !track2Features) && (track1Url && track2Url) && (
                   <p className="text-xs text-amber-300 mt-2">Waiting for track analysis to complete...</p>

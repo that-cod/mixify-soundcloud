@@ -21,6 +21,7 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     analyzeTrack
   } = useAudioAnalysis();
   
+  // Initialize mixing engine first so we can pass its methods to the prompt processor
   const {
     isMixing,
     mixProgress,
@@ -37,6 +38,7 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     handleTrack1WavesurferReady,
     handleTrack2WavesurferReady,
     handleMixedWavesurferReady,
+    applyPromptInstructions
   } = useMixingEngine({
     track1Url,
     track2Url,
@@ -44,15 +46,18 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     track2Features
   });
   
+  // Now initialize prompt processing with the applyPromptInstructions function
   const {
     isProcessingPrompt,
     promptProcessProgress,
     promptAnalysisResult,
-    handlePromptMix
+    handlePromptMix,
+    getInstructionInsights
   } = usePromptProcessing({
     track1Features,
     track2Features,
-    updateMixSettings
+    updateMixSettings,
+    applyPromptInstructions
   });
   
   // Analyze tracks when they're loaded
@@ -60,20 +65,23 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     if (track1Url && !track1Features) {
       analyzeTrack(track1Url, 1);
     }
-  }, [track1Url]);
+  }, [track1Url, track1Features]);
   
   useEffect(() => {
     if (track2Url && !track2Features) {
       analyzeTrack(track2Url, 2);
     }
-  }, [track2Url]);
+  }, [track2Url, track2Features]);
 
   // Create a wrapper for the handlePromptMix function to connect it with the mix workflow
   const processPromptAndMix = async (prompt: string) => {
     const success = await handlePromptMix(prompt);
     if (success) {
-      handleMix();
+      // We don't automatically mix here anymore, let the user decide when to mix
+      // This allows them to review and adjust the AI-suggested settings if needed
+      return true;
     }
+    return false;
   };
 
   return {
@@ -95,6 +103,7 @@ export const useMixerControls = ({ track1Url, track2Url }: UseMixerControlsProps
     isProcessingPrompt,
     promptProcessProgress,
     promptAnalysisResult,
+    getInstructionInsights,
     
     // Mix settings
     mixSettings,

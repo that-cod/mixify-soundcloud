@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Lightbulb, PenTool, AlertCircle } from 'lucide-react';
+import { Loader2, Lightbulb, PenTool, AlertCircle, Check, CheckCircle2 } from 'lucide-react';
+import { PromptAnalysisResult, MixingInstruction } from '@/services/anthropic-service';
 
 interface AudioFeatures {
   bpm: number;
@@ -19,7 +20,9 @@ interface PromptMixingInterfaceProps {
   track2Features: AudioFeatures | null;
   track1Name?: string;
   track2Name?: string;
+  promptAnalysisResult?: PromptAnalysisResult | null;
   onPromptSubmit: (prompt: string) => void;
+  onApplyAndMix?: () => void;
   hasApiKey?: boolean;
 }
 
@@ -30,7 +33,9 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
   track2Features,
   track1Name = "Track 1",
   track2Name = "Track 2",
+  promptAnalysisResult,
   onPromptSubmit,
+  onApplyAndMix,
   hasApiKey = false,
 }) => {
   const [prompt, setPrompt] = useState("");
@@ -52,6 +57,46 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
     if (prompt.trim()) {
       onPromptSubmit(prompt.trim());
     }
+  };
+
+  // Render the analysis result in a readable format
+  const renderAnalysisResult = () => {
+    if (!promptAnalysisResult) return null;
+    
+    return (
+      <div className="mt-4 space-y-4">
+        <div className="rounded-md bg-mixify-purple/10 border border-mixify-purple/30 p-3">
+          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-mixify-purple-light" />
+            AI Mix Plan
+          </h4>
+          <p className="text-sm">{promptAnalysisResult.summary}</p>
+          
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <h5 className="text-xs font-medium mb-1.5">Detected Instructions:</h5>
+            <div className="space-y-1.5">
+              {promptAnalysisResult.instructions
+                .filter(instruction => instruction.confidence > 0.7)
+                .map((instruction, idx) => (
+                  <div key={idx} className="flex items-start text-xs gap-1.5">
+                    <Check className="h-3 w-3 text-mixify-accent shrink-0 mt-0.5" />
+                    <span>{instruction.description}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+          
+          {onApplyAndMix && (
+            <Button 
+              onClick={onApplyAndMix}
+              className="mt-3 w-full bg-mixify-purple hover:bg-mixify-purple-dark"
+            >
+              Apply and Create Mix
+            </Button>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -94,76 +139,83 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
               </div>
             )}
 
-            <div className="rounded-md bg-white/5 p-3 text-sm">
-              <p className="mb-2 text-white/80">Available track information:</p>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-white/60">Track 1: </span>
-                  <span className="text-white/90">{track1Name}</span>
-                  {track1Features && (
-                    <p className="mt-1 text-white/70">
-                      {track1Features.bpm} BPM, Key: {track1Features.key}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <span className="text-white/60">Track 2: </span>
-                  <span className="text-white/90">{track2Name}</span>
-                  {track2Features && (
-                    <p className="mt-1 text-white/70">
-                      {track2Features.bpm} BPM, Key: {track2Features.key}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            {/* Analysis result display */}
+            {promptAnalysisResult && renderAnalysisResult()}
 
-            <div>
-              <label className="text-sm mb-2 block text-white/80">
-                How would you like your tracks mixed?
-              </label>
-              <Textarea
-                placeholder="Example: Match the BPM of both tracks, emphasize vocals from track 1, and create a smooth transition between them..."
-                className="bg-white/10 border-white/20 text-white min-h-[100px]"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowExamples(!showExamples)}
-                className="text-white/70"
-              >
-                <Lightbulb className="mr-2 h-4 w-4" />
-                {showExamples ? "Hide Examples" : "Show Examples"}
-              </Button>
-              <Button 
-                onClick={handleSubmit} 
-                disabled={!prompt.trim() || !track1Features || !track2Features || !hasApiKey}
-                className="bg-mixify-purple hover:bg-mixify-purple-dark"
-              >
-                Generate Mix
-              </Button>
-            </div>
-
-            {showExamples && (
-              <div className="mt-2 space-y-2 rounded-md bg-white/5 p-3">
-                <p className="text-sm text-white/80 mb-2">Example prompts:</p>
-                <div className="space-y-2">
-                  {examplePrompts.map((example, index) => (
-                    <div 
-                      key={index}
-                      className="text-xs p-2 bg-white/10 rounded cursor-pointer hover:bg-white/15"
-                      onClick={() => handleExampleClick(example)}
-                    >
-                      {example}
+            {!promptAnalysisResult && (
+              <>
+                <div className="rounded-md bg-white/5 p-3 text-sm">
+                  <p className="mb-2 text-white/80">Available track information:</p>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-white/60">Track 1: </span>
+                      <span className="text-white/90">{track1Name}</span>
+                      {track1Features && (
+                        <p className="mt-1 text-white/70">
+                          {track1Features.bpm} BPM, Key: {track1Features.key}
+                        </p>
+                      )}
                     </div>
-                  ))}
+                    <div>
+                      <span className="text-white/60">Track 2: </span>
+                      <span className="text-white/90">{track2Name}</span>
+                      {track2Features && (
+                        <p className="mt-1 text-white/70">
+                          {track2Features.bpm} BPM, Key: {track2Features.key}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+
+                <div>
+                  <label className="text-sm mb-2 block text-white/80">
+                    How would you like your tracks mixed?
+                  </label>
+                  <Textarea
+                    placeholder="Example: Match the BPM of both tracks, emphasize vocals from track 1, and create a smooth transition between them..."
+                    className="bg-white/10 border-white/20 text-white min-h-[100px]"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowExamples(!showExamples)}
+                    className="text-white/70"
+                  >
+                    <Lightbulb className="mr-2 h-4 w-4" />
+                    {showExamples ? "Hide Examples" : "Show Examples"}
+                  </Button>
+                  <Button 
+                    onClick={handleSubmit} 
+                    disabled={!prompt.trim() || !track1Features || !track2Features || !hasApiKey}
+                    className="bg-mixify-purple hover:bg-mixify-purple-dark"
+                  >
+                    Generate Mix
+                  </Button>
+                </div>
+
+                {showExamples && (
+                  <div className="mt-2 space-y-2 rounded-md bg-white/5 p-3">
+                    <p className="text-sm text-white/80 mb-2">Example prompts:</p>
+                    <div className="space-y-2">
+                      {examplePrompts.map((example, index) => (
+                        <div 
+                          key={index}
+                          className="text-xs p-2 bg-white/10 rounded cursor-pointer hover:bg-white/15"
+                          onClick={() => handleExampleClick(example)}
+                        >
+                          {example}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
