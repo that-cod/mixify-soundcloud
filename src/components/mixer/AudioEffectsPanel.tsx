@@ -1,26 +1,82 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AudioEffects } from '@/types/audio';
+import { AudioEffects, MixTrack } from '@/types/audio';
 
 interface AudioEffectsPanelProps {
-  effects: AudioEffects;
+  tracks: MixTrack[];
   onUpdateEffect: <K extends keyof AudioEffects>(
+    trackId: string,
     effectType: K,
     settings: Partial<AudioEffects[K]>
   ) => void;
 }
 
-export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanelProps) {
+export function AudioEffectsPanel({ tracks, onUpdateEffect }: AudioEffectsPanelProps) {
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(
+    tracks.length > 0 ? tracks[0].id : null
+  );
+
+  // If we have tracks but no selected track ID (or the selected track no longer exists)
+  // then select the first track
+  React.useEffect(() => {
+    if (tracks.length > 0) {
+      if (!selectedTrackId || !tracks.find(t => t.id === selectedTrackId)) {
+        setSelectedTrackId(tracks[0].id);
+      }
+    } else {
+      setSelectedTrackId(null);
+    }
+  }, [tracks, selectedTrackId]);
+
+  const selectedTrack = selectedTrackId ? tracks.find(t => t.id === selectedTrackId) : null;
+  const effects = selectedTrack?.effects || {} as AudioEffects;
+
+  if (!selectedTrack) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Audio Effects</CardTitle>
+          <CardDescription>No tracks available to apply effects</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const handleUpdateSelectedEffect = <K extends keyof AudioEffects>(
+    effectType: K,
+    settings: Partial<AudioEffects[K]>
+  ) => {
+    if (selectedTrackId) {
+      onUpdateEffect(selectedTrackId, effectType, settings);
+    }
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Audio Effects</CardTitle>
         <CardDescription>Apply effects to enhance your track</CardDescription>
+        
+        <div className="mt-4">
+          <Label htmlFor="track-selector">Select Track</Label>
+          <select 
+            id="track-selector"
+            className="w-full p-2 mt-1 bg-background border border-input rounded-md"
+            value={selectedTrackId || ''}
+            onChange={(e) => setSelectedTrackId(e.target.value)}
+          >
+            {tracks.map(track => (
+              <option key={track.id} value={track.id}>
+                {track.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="eq" className="w-full">
@@ -39,7 +95,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
               <Switch 
                 id="eq-enabled" 
                 checked={effects.eq.enabled}
-                onCheckedChange={(checked) => onUpdateEffect('eq', { enabled: checked })} 
+                onCheckedChange={(checked) => handleUpdateSelectedEffect('eq', { enabled: checked })} 
               />
             </div>
             
@@ -52,7 +108,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={1}
                   step={0.01}
                   value={[effects.eq.lowGain]}
-                  onValueChange={([value]) => onUpdateEffect('eq', { lowGain: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('eq', { lowGain: value })}
                   disabled={!effects.eq.enabled}
                 />
               </div>
@@ -65,7 +121,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={1}
                   step={0.01}
                   value={[effects.eq.midGain]}
-                  onValueChange={([value]) => onUpdateEffect('eq', { midGain: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('eq', { midGain: value })}
                   disabled={!effects.eq.enabled}
                 />
               </div>
@@ -78,7 +134,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={1}
                   step={0.01}
                   value={[effects.eq.highGain]}
-                  onValueChange={([value]) => onUpdateEffect('eq', { highGain: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('eq', { highGain: value })}
                   disabled={!effects.eq.enabled}
                 />
               </div>
@@ -92,7 +148,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
               <Switch 
                 id="comp-enabled" 
                 checked={effects.compression.enabled}
-                onCheckedChange={(checked) => onUpdateEffect('compression', { enabled: checked })} 
+                onCheckedChange={(checked) => handleUpdateSelectedEffect('compression', { enabled: checked })} 
               />
             </div>
             
@@ -105,7 +161,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={0}
                   step={1}
                   value={[effects.compression.threshold]}
-                  onValueChange={([value]) => onUpdateEffect('compression', { threshold: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('compression', { threshold: value })}
                   disabled={!effects.compression.enabled}
                 />
               </div>
@@ -118,7 +174,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={20}
                   step={0.5}
                   value={[effects.compression.ratio]}
-                  onValueChange={([value]) => onUpdateEffect('compression', { ratio: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('compression', { ratio: value })}
                   disabled={!effects.compression.enabled}
                 />
               </div>
@@ -131,7 +187,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={1}
                   step={0.001}
                   value={[effects.compression.attack]}
-                  onValueChange={([value]) => onUpdateEffect('compression', { attack: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('compression', { attack: value })}
                   disabled={!effects.compression.enabled}
                 />
               </div>
@@ -144,7 +200,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={2}
                   step={0.01}
                   value={[effects.compression.release]}
-                  onValueChange={([value]) => onUpdateEffect('compression', { release: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('compression', { release: value })}
                   disabled={!effects.compression.enabled}
                 />
               </div>
@@ -158,7 +214,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
               <Switch 
                 id="reverb-enabled" 
                 checked={effects.reverb.enabled}
-                onCheckedChange={(checked) => onUpdateEffect('reverb', { enabled: checked })} 
+                onCheckedChange={(checked) => handleUpdateSelectedEffect('reverb', { enabled: checked })} 
               />
             </div>
             
@@ -171,7 +227,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={1}
                   step={0.01}
                   value={[effects.reverb.mix]}
-                  onValueChange={([value]) => onUpdateEffect('reverb', { mix: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('reverb', { mix: value })}
                   disabled={!effects.reverb.enabled}
                 />
               </div>
@@ -184,7 +240,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={10}
                   step={0.1}
                   value={[effects.reverb.time]}
-                  onValueChange={([value]) => onUpdateEffect('reverb', { time: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('reverb', { time: value })}
                   disabled={!effects.reverb.enabled}
                 />
               </div>
@@ -197,7 +253,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={0.99}
                   step={0.01}
                   value={[effects.reverb.decay]}
-                  onValueChange={([value]) => onUpdateEffect('reverb', { decay: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('reverb', { decay: value })}
                   disabled={!effects.reverb.enabled}
                 />
               </div>
@@ -211,7 +267,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
               <Switch 
                 id="delay-enabled" 
                 checked={effects.delay.enabled}
-                onCheckedChange={(checked) => onUpdateEffect('delay', { enabled: checked })} 
+                onCheckedChange={(checked) => handleUpdateSelectedEffect('delay', { enabled: checked })} 
               />
             </div>
             
@@ -224,7 +280,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={2}
                   step={0.01}
                   value={[effects.delay.time]}
-                  onValueChange={([value]) => onUpdateEffect('delay', { time: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('delay', { time: value })}
                   disabled={!effects.delay.enabled}
                 />
               </div>
@@ -237,7 +293,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={0.95}
                   step={0.01}
                   value={[effects.delay.feedback]}
-                  onValueChange={([value]) => onUpdateEffect('delay', { feedback: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('delay', { feedback: value })}
                   disabled={!effects.delay.enabled}
                 />
               </div>
@@ -250,7 +306,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={1}
                   step={0.01}
                   value={[effects.delay.mix]}
-                  onValueChange={([value]) => onUpdateEffect('delay', { mix: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('delay', { mix: value })}
                   disabled={!effects.delay.enabled}
                 />
               </div>
@@ -264,7 +320,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
               <Switch 
                 id="distortion-enabled" 
                 checked={effects.distortion.enabled}
-                onCheckedChange={(checked) => onUpdateEffect('distortion', { enabled: checked })} 
+                onCheckedChange={(checked) => handleUpdateSelectedEffect('distortion', { enabled: checked })} 
               />
             </div>
             
@@ -277,7 +333,7 @@ export function AudioEffectsPanel({ effects, onUpdateEffect }: AudioEffectsPanel
                   max={1}
                   step={0.01}
                   value={[effects.distortion.amount]}
-                  onValueChange={([value]) => onUpdateEffect('distortion', { amount: value })}
+                  onValueChange={([value]) => handleUpdateSelectedEffect('distortion', { amount: value })}
                   disabled={!effects.distortion.enabled}
                 />
               </div>

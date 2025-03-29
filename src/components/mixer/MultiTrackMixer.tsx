@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -180,11 +179,6 @@ export const MultiTrackMixer: React.FC = () => {
     );
   };
   
-  // Handle effect updates - this function adapts the component interface to our hook interface
-  const handleUpdateEffect = (trackId: string, effectType: keyof AudioEffects, settings: Partial<AudioEffects[keyof AudioEffects]>) => {
-    updateTrackEffect(trackId, effectType, settings);
-  };
-  
   return (
     <div className="mx-auto max-w-7xl">
       <Tabs defaultValue="tracks" value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
@@ -234,7 +228,7 @@ export const MultiTrackMixer: React.FC = () => {
         <TabsContent value="effects" className="space-y-6">
           <AudioEffectsPanel 
             tracks={tracks}
-            onUpdateEffect={handleUpdateEffect}
+            onUpdateEffect={updateTrackEffect}
           />
         </TabsContent>
         
