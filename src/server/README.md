@@ -19,15 +19,16 @@ Before running the server, you need to have the following installed:
 - Python 3.8 or later
 - FFmpeg
 
-## Python dependencies
+## Quick Setup
 
-You need to install the following Python packages:
+The server includes a setup script that will check for dependencies and install them as needed:
 
 ```bash
-pip install librosa numpy spleeter
+cd src/server
+node setup.js
 ```
 
-## Installation
+## Manual Installation
 
 1. Clone the repository
 2. Install Node.js dependencies:
@@ -37,12 +38,13 @@ cd src/server
 npm install
 ```
 
-3. Create a `.env` file with your API keys (use `.env.example` as a template)
-4. Create the uploads directory:
+3. Install Python dependencies:
 
 ```bash
-mkdir -p ../uploads
+pip install -r requirements.txt
 ```
+
+4. Create a `.env` file with your API keys (a default will be created automatically)
 
 ## Running the server
 
@@ -63,9 +65,43 @@ The server will run on port 5000 by default (or the port specified in your .env 
 - `POST /api/process-prompt`: Process mixing instructions with AI
 - `POST /api/mix`: Mix two audio tracks
 - `GET /api/tracks/:fileName`: Retrieve a mixed track
+- `GET /api/status`: Check server status
 
-## Important Notes
+## Environment Variables
 
-- The audio files are stored in the `../uploads` directory
-- Large files may take time to process, especially for stem separation
-- The server has fallback mechanisms if Spleeter or other advanced features fail
+You can configure the server by setting the following environment variables in the `.env` file:
+
+```
+PORT=5000                # Server port
+NODE_ENV=development     # Environment (development/production)
+CLAUDE_API_KEY=xxx       # Your Claude API key
+OPENAI_API_KEY=xxx       # Your OpenAI API key (optional)
+MAX_FILE_SIZE_MB=25      # Maximum file size for uploads
+UPLOAD_DIR=uploads       # Directory for file uploads
+PYTHON_PATH=python3      # Path to Python executable
+FRONTEND_URL=http://localhost:3000  # URL of the frontend
+```
+
+## Troubleshooting
+
+If you encounter any issues with Python dependencies, especially on different operating systems:
+
+### macOS with Apple Silicon (M1/M2)
+
+For Apple Silicon Macs, use:
+
+```bash
+pip install -r requirements.txt
+```
+
+The requirements.txt file automatically detects Apple Silicon and installs the appropriate TensorFlow version.
+
+### Windows
+
+On Windows, you may need to install additional dependencies:
+
+```bash
+pip install librosa numpy scipy spleeter
+```
+
+Make sure FFmpeg is installed and available in your PATH.

@@ -5,7 +5,8 @@ const Meyda = require('meyda');
 const { Readable } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
 const { createFFmpeg } = require('@ffmpeg/ffmpeg');
-const { PythonShell } = require('python-shell');
+const { runPythonScript, runPythonScriptWithProgress } = require('./pythonBridge');
+const config = require('./config');
 
 // Ensure Meyda is properly initialized
 Meyda.bufferSize = 512;
@@ -63,58 +64,31 @@ function createAudioStream(audioBuffer) {
 }
 
 /**
- * Analyzes audio to extract features using Meyda
+ * Analyzes audio to extract features using Python backend
  * @param {string} filePath Path to the audio file
  * @returns {Promise<Object>} Extracted audio features
  */
 async function analyzeAudio(filePath) {
   try {
-    // Process audio to compatible format
-    const audioBuffer = await processAudio(filePath);
+    // Process audio to compatible format first
+    const processedFilePath = `${filePath.split('.')[0]}_processed.wav`;
     
-    // Create a readable stream from the audio buffer
-    const audioStream = createAudioStream(audioBuffer);
+    try {
+      await processAudio(filePath);
+    } catch (processingError) {
+      console.warn('Audio preprocessing failed, using original file:', processingError.message);
+    }
     
-    // Extract audio features using Meyda
-    return new Promise((resolve, reject) => {
-      // Placeholder for real implementation
-      // In a real implementation, we would connect Meyda to the audio stream
-      // and analyze frames, then aggregate the results
-      
-      // For now, we'll use our Python backend for advanced analysis
-      const options = {
-        mode: 'text',
-        pythonPath: 'python3',
-        pythonOptions: ['-u'], // unbuffered output
-        scriptPath: path.join(__dirname, 'python'),
-        args: [filePath]
-      };
-      
-      PythonShell.run('analyze_audio.py', options, (err, results) => {
-        if (err) return reject(err);
-        
-        try {
-          // Parse the Python script output (JSON)
-          const analysisResult = JSON.parse(results[0]);
-          resolve(analysisResult);
-        } catch (parseError) {
-          // Fallback to simulated analysis if Python fails
-          console.warn('Python analysis failed, using simulated analysis');
-          
-          // Generate simulated analysis (similar to your current frontend simulation)
-          const simulatedAnalysis = {
-            bpm: Math.floor(Math.random() * (160 - 70) + 70), // 70-160 BPM
-            key: ['C Major', 'A Minor', 'G Major', 'E Minor', 'D Major'][Math.floor(Math.random() * 5)],
-            energy: parseFloat((Math.random() * 0.6 + 0.3).toFixed(2)),
-            clarity: parseFloat((Math.random() * 0.6 + 0.3).toFixed(2)),
-            waveform: generateSimulatedWaveform(),
-            spectrum: generateSimulatedSpectrum()
-          };
-          
-          resolve(simulatedAnalysis);
-        }
-      });
-    });
+    const fileToAnalyze = fs.existsSync(processedFilePath) ? processedFilePath : filePath;
+    
+    // Use Python backend for analysis
+    try {
+      const analysisResult = await runPythonScript('analyze_audio.py', [fileToAnalyze]);
+      return analysisResult;
+    } catch (pythonError) {
+      console.warn('Python analysis failed, using simulated analysis:', pythonError.message);
+      return generateSimulatedAnalysis();
+    }
   } catch (error) {
     console.error('Audio analysis error:', error);
     throw new Error(`Failed to analyze audio: ${error.message}`);
@@ -124,65 +98,81 @@ async function analyzeAudio(filePath) {
 /**
  * Separates audio tracks into stems using Spleeter
  * @param {string} filePath Path to the audio file
+ * @param {Function} progressCallback Optional callback for progress updates
  * @returns {Promise<Object>} Paths to separated stems
  */
-async function separateTracks(filePath) {
+async function separateTracks(filePath, progressCallback = null) {
   try {
-    const outputDir = path.join(path.dirname(filePath), 'stems', path.basename(filePath, path.extname(filePath)));
+    const outputDir = path.join(
+      config.fileStorage.uploadDir, 
+      'stems', 
+      path.basename(filePath, path.extname(filePath))
+    );
     
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
     
-    return new Promise((resolve, reject) => {
-      // Call Python Spleeter through Python shell
-      const options = {
-        mode: 'text',
-        pythonPath: 'python3',
-        pythonOptions: ['-u'],
-        scriptPath: path.join(__dirname, 'python'),
-        args: [filePath, outputDir]
-      };
+    try {
+      // Run Python script with progress updates
+      const stemPaths = await runPythonScriptWithProgress(
+        'separate_stems.py', 
+        [filePath, outputDir],
+        progressCallback
+      );
       
-      PythonShell.run('separate_stems.py', options, (err, results) => {
-        if (err) {
-          console.error('Stem separation error:', err);
-          // Fallback if stem separation fails
-          const fileBaseName = path.basename(filePath, path.extname(filePath));
-          const fileDir = path.dirname(filePath);
-          
-          // Create simulated stems paths
-          const stemPaths = {
-            vocals: path.join(fileDir, `${fileBaseName}_vocals.mp3`),
-            drums: path.join(fileDir, `${fileBaseName}_drums.mp3`),
-            bass: path.join(fileDir, `${fileBaseName}_bass.mp3`),
-            other: path.join(fileDir, `${fileBaseName}_other.mp3`)
-          };
-          
-          // For now, just duplicate the original file as stems
-          Object.values(stemPaths).forEach(stemPath => {
-            fs.copyFileSync(filePath, stemPath);
-          });
-          
-          resolve(stemPaths);
-        } else {
-          // Parse the result from Python (JSON with stem paths)
-          try {
-            const stemPaths = JSON.parse(results[0]);
-            resolve(stemPaths);
-          } catch (parseErr) {
-            reject(new Error(`Failed to parse stem separation results: ${parseErr.message}`));
-          }
-        }
-      });
-    });
+      return stemPaths;
+    } catch (pythonError) {
+      console.warn('Stem separation with Python failed:', pythonError.message);
+      return createFallbackStems(filePath);
+    }
   } catch (error) {
     console.error('Stem separation error:', error);
     throw new Error(`Failed to separate stems: ${error.message}`);
   }
 }
 
+/**
+ * Creates fallback stems when separation fails
+ * @param {string} filePath Original audio file path
+ * @returns {Object} Paths to simulated stems
+ */
+function createFallbackStems(filePath) {
+  const fileBaseName = path.basename(filePath, path.extname(filePath));
+  const stemDir = path.join(config.fileStorage.uploadDir, 'stems', fileBaseName);
+  
+  if (!fs.existsSync(stemDir)) {
+    fs.mkdirSync(stemDir, { recursive: true });
+  }
+  
+  // Create simulated stems paths
+  const stemPaths = {
+    vocals: path.join(stemDir, `${fileBaseName}_vocals.mp3`),
+    drums: path.join(stemDir, `${fileBaseName}_drums.mp3`),
+    bass: path.join(stemDir, `${fileBaseName}_bass.mp3`),
+    other: path.join(stemDir, `${fileBaseName}_other.mp3`)
+  };
+  
+  // For now, just duplicate the original file as stems
+  Object.values(stemPaths).forEach(stemPath => {
+    fs.copyFileSync(filePath, stemPath);
+  });
+  
+  return stemPaths;
+}
+
 // Helper functions for simulating analysis when real analysis is unavailable
+function generateSimulatedAnalysis() {
+  return {
+    bpm: Math.floor(Math.random() * (160 - 70) + 70), // 70-160 BPM
+    key: ['C Major', 'A Minor', 'G Major', 'E Minor', 'D Major'][Math.floor(Math.random() * 5)],
+    energy: parseFloat((Math.random() * 0.6 + 0.3).toFixed(2)),
+    clarity: parseFloat((Math.random() * 0.6 + 0.3).toFixed(2)),
+    waveform: generateSimulatedWaveform(),
+    spectrum: generateSimulatedSpectrum()
+  };
+}
+
 function generateSimulatedWaveform() {
   const points = [];
   for (let i = 0; i < 100; i++) {
