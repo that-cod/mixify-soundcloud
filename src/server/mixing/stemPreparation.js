@@ -1,13 +1,85 @@
 
 /**
  * Stem preparation module
- * Handles stem separation and caching logic
+ * Handles stem separation with caching support
  */
 
 const path = require('path');
 const fs = require('fs');
-const { pathResolver } = require('../utils/systemUtils');
 const { separateTracks } = require('../audio');
+const { 
+  generateStemCachePath, 
+  readStemsFromCache,
+  writeStemsToCache
+} = require('./stemCache');
+
+/**
+ * Create output directories for stems
+ * @param {string} tempDir Base temporary directory
+ * @returns {Object} Object with paths to track directories
+ */
+function createStemDirectories(tempDir) {
+  const track1Dir = path.join(tempDir, 'track1');
+  const track2Dir = path.join(tempDir, 'track2');
+  
+  if (!fs.existsSync(track1Dir)) {
+    fs.mkdirSync(track1Dir, { recursive: true });
+  }
+  
+  if (!fs.existsSync(track2Dir)) {
+    fs.mkdirSync(track2Dir, { recursive: true });
+  }
+  
+  return { track1Dir, track2Dir };
+}
+
+/**
+ * Process individual track to separate stems
+ * @param {string} trackPath Path to audio track
+ * @param {string} outputDir Output directory for stems
+ * @param {Object} settings Mixing settings
+ * @param {string} cachePrefix Prefix for cache files
+ * @returns {Promise<Object>} Object containing stem paths
+ */
+async function processTrackStems(trackPath, outputDir, settings, cachePrefix) {
+  // Generate cache path and check if we have cached stems
+  const cachePath = generateStemCachePath(trackPath, cachePrefix);
+  const cachedStems = readStemsFromCache(cachePath);
+  
+  if (cachedStems) {
+    return cachedStems;
+  }
+  
+  // Configure separation options
+  const separationOptions = {
+    outputDir: outputDir,
+    lightMode: settings.optimizationLevel === 'light',
+    highQuality: settings.highQualityOutput,
+    useCache: true,
+    cachePath: cachePath
+  };
+  
+  // Separate stems
+  const stems = await separateTracks(trackPath, separationOptions);
+  
+  // Verify we have valid stems
+  if (!stems) {
+    throw new Error(`Stem separation failed for ${path.basename(trackPath)}`);
+  }
+  
+  // Verify all required stem types exist
+  const requiredStems = ['vocals', 'drums', 'bass', 'other'];
+  for (const stem of requiredStems) {
+    if (!stems[stem]) {
+      throw new Error(`Missing ${stem} stem for ${path.basename(trackPath)}`);
+    }
+  }
+  
+  // Cache the results
+  writeStemsToCache(cachePath, stems);
+  
+  return stems;
+}
 
 /**
  * Prepare stems for both tracks with caching support
@@ -18,51 +90,17 @@ const { separateTracks } = require('../audio');
  * @returns {Promise<Object>} Object containing stems for both tracks
  */
 async function prepareStems(track1Path, track2Path, settings, tempDir) {
-  // Create unique cache directories for stems
-  const cacheDir = path.join(pathResolver.getUploadDir(), 'cache');
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-  
-  const track1StemCachePath = path.join(cacheDir, `track1_${path.basename(track1Path).split('.')[0]}_stems.json`);
-  const track2StemCachePath = path.join(cacheDir, `track2_${path.basename(track2Path).split('.')[0]}_stems.json`);
-  
-  console.log('Separating stems for tracks...');
-  let track1Stems, track2Stems;
-  
   try {
-    const separationOptions = {
-      outputDir: tempDir,
-      lightMode: settings.optimizationLevel === 'light',
-      highQuality: settings.highQualityOutput,
-      useCache: true
-    };
+    // Create output directories
+    const { track1Dir, track2Dir } = createStemDirectories(tempDir);
     
-    [track1Stems, track2Stems] = await Promise.all([
-      separateTracks(track1Path, {
-        ...separationOptions,
-        outputDir: path.join(tempDir, 'track1'),
-        cachePath: track1StemCachePath
-      }),
-      separateTracks(track2Path, {
-        ...separationOptions,
-        outputDir: path.join(tempDir, 'track2'),
-        cachePath: track2StemCachePath
-      })
+    console.log('Separating stems for tracks...');
+    
+    // Process both tracks in parallel
+    const [track1Stems, track2Stems] = await Promise.all([
+      processTrackStems(track1Path, track1Dir, settings, 'track1'),
+      processTrackStems(track2Path, track2Dir, settings, 'track2')
     ]);
-    
-    // Verify we have valid stems
-    if (!track1Stems || !track2Stems) {
-      throw new Error("Stem separation failed for one or both tracks");
-    }
-    
-    // Check that all required stem types exist
-    const requiredStems = ['vocals', 'drums', 'bass', 'other'];
-    for (const stem of requiredStems) {
-      if (!track1Stems[stem] || !track2Stems[stem]) {
-        throw new Error(`Missing ${stem} stem for one or both tracks`);
-      }
-    }
     
     return { track1Stems, track2Stems };
   } catch (separationError) {
@@ -72,5 +110,7 @@ async function prepareStems(track1Path, track2Path, settings, tempDir) {
 }
 
 module.exports = {
-  prepareStems
+  prepareStems,
+  processTrackStems, // Export for testing or advanced use cases
+  createStemDirectories // Export for testing
 };
