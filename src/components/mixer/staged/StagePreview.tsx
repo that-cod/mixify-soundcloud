@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WaveformDisplay } from '../WaveformDisplay';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Download } from 'lucide-react';
+import { Play, Pause, Download, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface StagePreviewProps {
@@ -20,9 +20,12 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
   const [loadError, setLoadError] = useState(false);
   const { toast } = useToast();
 
+  console.log("StagePreview rendering with URL:", previewUrl);
+
   // Reset states when URL changes
   useEffect(() => {
     if (previewUrl) {
+      console.log("Preview URL changed:", previewUrl);
       setIsLoaded(false);
       setLoadError(false);
       setIsPlaying(false);
@@ -127,7 +130,7 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
   }
   
   return (
-    <div className="mb-4">
+    <div className="mb-4 relative">
       <h4 className="text-sm font-medium mb-2">Stage Preview</h4>
       
       {/* Always show waveform regardless of load state */}
@@ -171,7 +174,8 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
       
       {/* Error message when load fails */}
       {loadError && (
-        <div className="text-destructive text-sm mt-2">
+        <div className="text-destructive text-sm mt-2 bg-destructive/10 p-2 rounded flex items-center">
+          <AlertCircle className="h-4 w-4 mr-2 text-destructive" />
           Failed to load audio preview. The mixing process may not have completed correctly.
         </div>
       )}

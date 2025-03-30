@@ -10,6 +10,8 @@ import { StagePreview } from './staged/StagePreview';
 import { PlaybackControls } from './PlaybackControls';
 import { formatParamLabel } from './staged/utils';
 import { useToast } from '@/hooks/use-toast';
+import { ApiKeyStatus } from './ApiKeyStatus';
+import { AlertCircle, Info } from 'lucide-react';
 
 interface StagedMixingProcessProps {
   track1Url: string | undefined;
@@ -35,6 +37,7 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
   const [overallProgress, setOverallProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
+  const [checkApiKeyStatus, setCheckApiKeyStatus] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
   
@@ -66,7 +69,7 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
         audioRef.current.pause();
       }
     }
-  }, [isPlaying]);
+  }, [isPlaying, toast]);
 
   // Update volume when it changes
   useEffect(() => {
@@ -78,6 +81,7 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
   // Effect to handle audio element source changes
   useEffect(() => {
     if (audioRef.current && stagePreviewUrl) {
+      console.log("Setting audio source to:", stagePreviewUrl);
       audioRef.current.src = stagePreviewUrl;
       audioRef.current.load();
     }
@@ -172,6 +176,7 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
         }
         
         if (previewUrl) {
+          console.log("Setting stage preview URL:", previewUrl);
           setStagePreviewUrl(previewUrl);
           setStageStatus('complete');
           
@@ -210,76 +215,110 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
   const showPreviewControls = currentStage === 'finalMix' && stageStatus === 'complete';
   
   return (
-    <Card className="glass-card">
-      <CardHeader>
-        <CardTitle>Multi-Stage Mixing Process</CardTitle>
-        <CardDescription>
-          {currentStage === 'complete' 
-            ? 'Mix completed successfully' 
-            : currentStageInfo?.description || 'Processing tracks'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {/* Progress indicators */}
-        <StageProgress
-          overallProgress={overallProgress}
-          stageProgress={stageProgress}
-          currentStage={currentStage}
-          stageStatus={stageStatus}
-        />
-        
-        {/* Stage preview - only show if we have a preview URL */}
-        {stagePreviewUrl && (
-          <StagePreview 
-            previewUrl={stagePreviewUrl}
-            showControls={showPreviewControls}
+    <div className="space-y-4">
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle>Multi-Stage Mixing Process</CardTitle>
+          <CardDescription>
+            {currentStage === 'complete' 
+              ? 'Mix completed successfully' 
+              : currentStageInfo?.description || 'Processing tracks'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Progress indicators */}
+          <StageProgress
+            overallProgress={overallProgress}
+            stageProgress={stageProgress}
+            currentStage={currentStage}
+            stageStatus={stageStatus}
           />
-        )}
-        
-        {/* Hidden audio element for playback */}
-        <audio 
-          ref={audioRef} 
-          src={stagePreviewUrl} 
-          style={{ display: 'none' }} 
-          onError={(e) => console.error("Main audio element error:", e)}
-        />
-        
-        {/* Playback controls for completed mix */}
-        {showPlaybackControls && stagePreviewUrl && (
-          <div className="my-4">
-            <PlaybackControls
-              isPlaying={isPlaying}
-              togglePlayback={togglePlayback}
-              volume={volume}
-              setVolume={setVolume}
-              restart={restartPlayback}
-              downloadUrl={stagePreviewUrl}
-              trackName="mixify-mixed-track.mp3"
-            />
+          
+          {/* Stage preview - only show if we have a preview URL */}
+          {stagePreviewUrl && (
+            <div className="my-4">
+              <StagePreview 
+                previewUrl={stagePreviewUrl}
+                showControls={showPreviewControls}
+              />
+            </div>
+          )}
+          
+          {/* Warning message when we should have a preview but don't */}
+          {currentStage === 'finalMix' && stageStatus === 'complete' && !stagePreviewUrl && (
+            <div className="my-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-md flex items-start">
+              <AlertCircle className="h-5 w-5 text-yellow-500 mr-2 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-500 mb-1">Preview not available</p>
+                <p className="text-xs text-yellow-400/80">
+                  The final mix preview could not be generated. This might be due to an issue with the audio processing.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {/* Hidden audio element for playback */}
+          <audio 
+            ref={audioRef} 
+            src={stagePreviewUrl} 
+            style={{ display: 'none' }} 
+            onError={(e) => console.error("Main audio element error:", e)}
+          />
+          
+          {/* Playback controls for completed mix */}
+          {showPlaybackControls && stagePreviewUrl && (
+            <div className="my-4">
+              <PlaybackControls
+                isPlaying={isPlaying}
+                togglePlayback={togglePlayback}
+                volume={volume}
+                setVolume={setVolume}
+                restart={restartPlayback}
+                downloadUrl={stagePreviewUrl}
+                trackName="mixify-mixed-track.mp3"
+              />
+            </div>
+          )}
+          
+          {/* Controls */}
+          <StageControls
+            currentStage={currentStage}
+            status={stageStatus}
+            stageName={currentStageInfo?.label || ''}
+            onStartStage={handleStartStage}
+            onPauseStage={handlePauseStage}
+            onResumeStage={handleResumeStage}
+            onSkipToNextStage={handleSkipToNextStage}
+            onRestartStage={handleRestartStage}
+            onCancel={onCancel}
+          />
+          
+          {/* Adjustable parameters */}
+          <StageParameters
+            params={currentStageInfo?.adjustableParams || []}
+            settings={settings}
+            updateSetting={updateSetting}
+            isProcessing={stageStatus === 'processing'}
+          />
+          
+          {/* Link to check API keys */}
+          <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+            <div className="flex items-center text-sm text-white/60">
+              <Info className="h-4 w-4 mr-2" />
+              Having issues with AI mixing?
+            </div>
+            <button
+              onClick={() => setCheckApiKeyStatus(!checkApiKeyStatus)}
+              className="text-sm text-mixify-accent underline"
+            >
+              {checkApiKeyStatus ? "Hide API status" : "Check API keys"}
+            </button>
           </div>
-        )}
-        
-        {/* Controls */}
-        <StageControls
-          currentStage={currentStage}
-          status={stageStatus}
-          stageName={currentStageInfo?.label || ''}
-          onStartStage={handleStartStage}
-          onPauseStage={handlePauseStage}
-          onResumeStage={handleResumeStage}
-          onSkipToNextStage={handleSkipToNextStage}
-          onRestartStage={handleRestartStage}
-          onCancel={onCancel}
-        />
-        
-        {/* Adjustable parameters */}
-        <StageParameters
-          params={currentStageInfo?.adjustableParams || []}
-          settings={settings}
-          updateSetting={updateSetting}
-          isProcessing={stageStatus === 'processing'}
-        />
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+      
+      {/* API Key Status Card */}
+      {checkApiKeyStatus && <ApiKeyStatus />}
+    </div>
   );
 };
