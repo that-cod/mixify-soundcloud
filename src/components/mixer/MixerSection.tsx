@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -226,7 +225,6 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
           promptAnalysisResult={promptAnalysisResult}
           onPromptSubmit={handlePromptSubmit}
           onApplyAndMix={handleApplyAndMix}
-          hasApiKey={true} // Always true now since we have the API key hardcoded
         />
       )}
     
