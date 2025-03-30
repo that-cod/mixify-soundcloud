@@ -2,6 +2,7 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { BucketStatus } from '@/services/storage-service';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BucketStatusAlertProps {
   bucketStatus: BucketStatus;
@@ -12,6 +13,13 @@ export const BucketStatusAlert: React.FC<BucketStatusAlertProps> = ({
   bucketStatus, 
   bucketName 
 }) => {
+  const { user } = useAuth();
+
+  // Don't show bucket status alerts to logged in users
+  if (user) {
+    return null;
+  }
+  
   // Only render if there's an issue with the bucket
   if (!bucketStatus || (bucketStatus.exists && bucketStatus.canUpload)) {
     return null;

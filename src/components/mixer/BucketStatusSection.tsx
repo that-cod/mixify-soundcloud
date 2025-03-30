@@ -3,6 +3,7 @@ import React from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BucketStatus, AUDIO_BUCKET } from '@/services/storage-service';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BucketStatusSectionProps {
   bucketStatus: BucketStatus | null;
@@ -13,8 +14,15 @@ export const BucketStatusSection: React.FC<BucketStatusSectionProps> = ({
   bucketStatus,
   storageBucketChecking,
 }) => {
+  const { user } = useAuth();
+
+  // Hide all bucket status messages if user is logged in or not in development mode
+  if (!import.meta.env.DEV || user) {
+    return null;
+  }
+
   // When checking bucket status, show loading indicator only in development mode
-  if (storageBucketChecking && import.meta.env.DEV) {
+  if (storageBucketChecking) {
     return (
       <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-lg">
         <div className="flex items-center">
@@ -23,11 +31,6 @@ export const BucketStatusSection: React.FC<BucketStatusSectionProps> = ({
         </div>
       </div>
     );
-  }
-
-  // In production, hide all bucket status messages
-  if (!import.meta.env.DEV) {
-    return null;
   }
   
   // Check for critical conditions: if bucket status is null or canUpload is true, don't show warnings
