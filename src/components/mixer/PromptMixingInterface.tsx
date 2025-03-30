@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Sparkles, ArrowRightIcon } from 'lucide-react';
 import { PromptInstructionsList } from './PromptInstructionsList';
 import { AudioFeatures } from '@/types/audio';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { PromptAnalysisResult } from '@/services/openai-service';
 import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 
 interface PromptMixingInterfaceProps {
@@ -107,7 +108,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
           {!anyKeyValid && (
             <div className="bg-red-900/20 border border-red-800/30 text-red-400 p-3 rounded-md text-sm mb-3">
               <p className="font-medium mb-1">API Key Required</p>
-              <p>You need to add a valid Claude or OpenAI API key to use this feature. Check the API Key Status below.</p>
+              <p>You need to add a valid OpenAI API key to use this feature. Check the API Key Status below.</p>
             </div>
           )}
           

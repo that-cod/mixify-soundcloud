@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { PromptAnalysisResult } from '@/services/openai-service';
 import { AudioFeatures } from '@/types/audio';
 import { processPromptMix } from '@/utils/prompt-processor';
 import { getInstructionInsights } from '@/utils/ai-prompt-analysis';
@@ -51,8 +51,8 @@ export const usePromptProcessing = ({
       
       // Display the results to the user
       toast({
-        title: source === "Server" ? "Analysis Complete" : `Analysis Complete (${source} Fallback Mode)`,
-        description: analysisResult.summary || `AI has determined the optimal mix settings based on your prompt! ${source !== "Server" ? `(processed by ${source})` : ""}`,
+        title: source === "Server" ? "Analysis Complete" : `Analysis Complete (OpenAI)`,
+        description: analysisResult.summary || `AI has determined the optimal mix settings based on your prompt! ${source !== "Server" ? `(processed by OpenAI)` : ""}`,
       });
       
       setIsProcessingPrompt(false);
@@ -81,7 +81,7 @@ export const usePromptProcessing = ({
     if (!anyKeyValid) {
       toast({
         title: "API Key Issue",
-        description: "No valid AI API keys found. Please check API key status.",
+        description: "No valid OpenAI API key found. Please check API key status.",
         variant: "destructive",
       });
       return false;

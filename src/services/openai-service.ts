@@ -1,13 +1,38 @@
 
-import { 
-  AudioFeatures, 
-  PromptAnalysisResult, 
-  DEFAULT_MIX_SETTINGS
-} from './anthropic-types';
+import { MixSettingsType } from '@/types/mixer';
+import { AudioFeatures } from '@/types/audio';
 
-const API_URL = "https://api.openai.com/v1/chat/completions";
-const MODEL = "gpt-4-turbo"; // OpenAI's latest model
-const MAX_TOKENS = 4000;
+// API constants
+export const API_URL = "https://api.openai.com/v1/chat/completions";
+export const MODEL = "gpt-4o-mini"; // Using a modern model
+export const MAX_TOKENS = 4000;
+
+// Default mix settings that will be used as fallback
+export const DEFAULT_MIX_SETTINGS: MixSettingsType = {
+  bpmMatch: true,
+  keyMatch: true,
+  vocalLevel1: 0.8,
+  vocalLevel2: 0.8,
+  beatLevel1: 0.8,
+  beatLevel2: 0.8,
+  crossfadeLength: 8,
+  echo: 0.3,
+  tempo: 0
+};
+
+// Prompt analysis result type
+export interface MixingInstruction {
+  type: string;
+  description: string;
+  value: any;
+  confidence: number;
+}
+
+export interface PromptAnalysisResult {
+  instructions: MixingInstruction[];
+  summary: string;
+  recommendedSettings: MixSettingsType;
+}
 
 /**
  * Main function to analyze prompt using OpenAI API
@@ -113,7 +138,7 @@ export const analyzePromptWithOpenAI = async (
     
     // Return a fallback analysis result
     return createFallbackAnalysis(track1Features, track2Features, 
-      `OpenAI analysis failed: ${error.message}. Using default settings.`);
+      `OpenAI analysis failed: ${error instanceof Error ? error.message : "Unknown error"}. Using default settings.`);
   }
 };
 
@@ -201,5 +226,3 @@ function createFallbackAnalysis(
     }
   };
 }
-
-export default { analyzePromptWithOpenAI };

@@ -3,12 +3,12 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { saveApiKey, validateClaudeApiKey, validateOpenAIApiKey } from '@/utils/api-key-validator';
+import { saveApiKey, validateOpenAIApiKey } from '@/utils/api-key-validator';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
 interface ApiKeyInputProps {
-  provider: 'claude' | 'openai';
+  provider: 'openai';
   onValidationComplete: () => void;
 }
 
@@ -31,8 +31,7 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ provider, onValidation
     
     try {
       // Validate the key before saving
-      const validator = provider === 'claude' ? validateClaudeApiKey : validateOpenAIApiKey;
-      const result = await validator(apiKey);
+      const result = await validateOpenAIApiKey(apiKey);
       
       if (result.valid) {
         // Save the key to localStorage
@@ -40,7 +39,7 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ provider, onValidation
         
         toast({
           title: "Success",
-          description: `${provider === 'claude' ? 'Anthropic Claude' : 'OpenAI'} API key saved successfully.`,
+          description: `OpenAI API key saved successfully.`,
         });
         
         // Trigger the callback to refresh key status
@@ -69,21 +68,19 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ provider, onValidation
     }
   };
   
-  const providerName = provider === 'claude' ? 'Anthropic Claude' : 'OpenAI';
-  
   return (
     <Card className="mt-2">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">{providerName} API Key</CardTitle>
+        <CardTitle className="text-base">OpenAI API Key</CardTitle>
         <CardDescription>
-          Enter your {providerName} API key to enable AI-powered features
+          Enter your OpenAI API key to enable AI-powered features
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex space-x-2">
           <Input
             type="password"
-            placeholder={`Enter ${providerName} API key`}
+            placeholder="Enter OpenAI API key"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             onKeyDown={handleKeyDown}

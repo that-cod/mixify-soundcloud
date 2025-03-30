@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ApiKeyInput } from './ApiKeyInput';
 
 export const ApiKeyStatus: React.FC = () => {
-  const { claude, openai, isChecking, error, checkKeys } = useApiKeyStatus();
+  const { openai, isChecking, error, checkKeys } = useApiKeyStatus();
   
   const renderStatus = (status: {valid: boolean; message: string} | null, name: string) => {
     if (!status) {
@@ -37,7 +37,7 @@ export const ApiKeyStatus: React.FC = () => {
     }
   };
   
-  const anyKeyValid = (claude?.valid || openai?.valid) === true;
+  const anyKeyValid = openai?.valid === true;
   
   return (
     <Card className="glass-card mt-4">
@@ -45,7 +45,7 @@ export const ApiKeyStatus: React.FC = () => {
         <div>
           <CardTitle>API Key Status</CardTitle>
           <CardDescription>
-            Enter your API keys to enable AI-powered mixing features
+            Enter your OpenAI API key to enable AI-powered mixing features
           </CardDescription>
         </div>
         <Button 
@@ -62,16 +62,10 @@ export const ApiKeyStatus: React.FC = () => {
         {isChecking ? (
           <div className="flex justify-center items-center py-4">
             <Loader2 className="h-8 w-8 text-mixify-purple-light animate-spin" />
-            <span className="ml-2">Checking API keys...</span>
+            <span className="ml-2">Checking API key...</span>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="p-3 rounded-md bg-white/5">
-              <h3 className="text-sm font-medium mb-2">Anthropic Claude API</h3>
-              {renderStatus(claude, "Claude")}
-              {!claude?.valid && <ApiKeyInput provider="claude" onValidationComplete={checkKeys} />}
-            </div>
-            
             <div className="p-3 rounded-md bg-white/5">
               <h3 className="text-sm font-medium mb-2">OpenAI API</h3>
               {renderStatus(openai, "OpenAI")}
@@ -83,7 +77,7 @@ export const ApiKeyStatus: React.FC = () => {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>API Key Required</AlertTitle>
                 <AlertDescription>
-                  Please enter at least one valid AI API key to use AI-powered mixing features.
+                  Please enter a valid OpenAI API key to use AI-powered mixing features.
                 </AlertDescription>
               </Alert>
             )}
@@ -100,8 +94,8 @@ export const ApiKeyStatus: React.FC = () => {
         )}
         
         <p className="text-xs text-white/60 mt-2">
-          Note: Your API keys are stored locally in your browser and are never sent to our servers.
-          These keys are required for AI-powered mixing features to work.
+          Note: Your API key is stored locally in your browser and is never sent to our servers.
+          This key is required for AI-powered mixing features to work.
         </p>
       </CardContent>
     </Card>

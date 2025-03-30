@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,7 @@ import { StagedMixingProcess } from './StagedMixingProcess';
 import { StagedMixSettings } from './staged/types';
 import WaveSurfer from 'wavesurfer.js';
 import { useToast } from '@/hooks/use-toast';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { PromptAnalysisResult } from '@/services/openai-service';
 import { AudioFeatures } from '@/types/audio';
 import { ApiKeyStatus } from './ApiKeyStatus';
 import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
@@ -95,17 +94,17 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
 }) => {
   const [mixMode, setMixMode] = useState<'manual' | 'prompt'>('manual');
   const { toast } = useToast();
-  const { claude, openai } = useApiKeyStatus();
+  const { openai } = useApiKeyStatus();
   
-  // Calculate if any key is valid
-  const anyKeyValid = (claude?.valid === true || openai?.valid === true);
+  // Calculate if OpenAI key is valid
+  const anyKeyValid = openai?.valid === true;
 
   const handlePromptSubmit = (prompt: string) => {
     // Check for API key before submitting
     if (!anyKeyValid) {
       toast({
         title: "API Key Issue",
-        description: "No valid AI API keys found. Please check API key status.",
+        description: "No valid OpenAI API key found. Please check API key status.",
         variant: "destructive",
       });
       return;

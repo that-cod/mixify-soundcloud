@@ -2,11 +2,11 @@
 import { API } from '@/config';
 import axios from 'axios';
 import { AudioFeatures } from '@/types/audio';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
-import { processWithFallbackAI } from './ai-fallback';
+import { PromptAnalysisResult } from '@/services/openai-service';
+import { processWithOpenAI } from './ai-fallback';
 
 /**
- * Process a mixing prompt with backend or fallback to direct AI APIs
+ * Process a mixing prompt with backend or fallback to direct OpenAI API
  */
 export const processPromptMix = async (
   prompt: string,
@@ -54,10 +54,10 @@ export const processPromptMix = async (
     console.error("Error processing prompt with backend:", error);
     clearInterval(progressInterval);
     
-    // Try fallback to the direct AI API
-    console.log("Attempting fallback to direct AI APIs...");
+    // Try fallback to the direct OpenAI API
+    console.log("Attempting fallback to direct OpenAI API...");
     try {
-      const result = await processWithFallbackAI(
+      const result = await processWithOpenAI(
         prompt, 
         track1Features, 
         track2Features,

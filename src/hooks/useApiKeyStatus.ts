@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { checkApiKeys } from '@/utils/api-key-validator';
 
 interface ApiKeyStatus {
-  claude: { valid: boolean; message: string } | null;
   openai: { valid: boolean; message: string } | null;
   isChecking: boolean;
   error: string | null;
@@ -13,7 +12,6 @@ interface ApiKeyStatus {
 
 export function useApiKeyStatus(): ApiKeyStatus {
   const [status, setStatus] = useState<Omit<ApiKeyStatus, 'checkKeys' | 'anyKeyValid'>>({
-    claude: null,
     openai: null,
     isChecking: true,
     error: null
@@ -27,7 +25,6 @@ export function useApiKeyStatus(): ApiKeyStatus {
       const result = await checkApiKeys();
       console.log("API key check result:", result);
       setStatus({
-        claude: result.claude,
         openai: result.openai,
         isChecking: false,
         error: null
@@ -46,11 +43,8 @@ export function useApiKeyStatus(): ApiKeyStatus {
     validateKeys();
   }, [validateKeys]);
 
-  // Calculate if any key is valid - using explicit comparison for safety
-  const anyKeyValid = Boolean(
-    (status.claude && status.claude.valid === true) || 
-    (status.openai && status.openai.valid === true)
-  );
+  // Calculate if OpenAI key is valid
+  const anyKeyValid = Boolean(status.openai && status.openai.valid === true);
 
   return {
     ...status,
