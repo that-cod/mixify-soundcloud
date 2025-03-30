@@ -5,7 +5,7 @@ import { MainLayout } from '@/components/layouts/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { TrackSection } from '@/components/mixer/TrackSection';
 import { BucketStatusSection } from '@/components/mixer/BucketStatusSection';
-import { MixerSection } from '@/components/mixer/MixerSection';
+import { MixerSection } from '@/components/mixer/section/MixerSection';
 import { useBucketStatus } from '@/hooks/useBucketStatus';
 import { useMixerControls } from '@/hooks/useMixerControls';
 
