@@ -29,7 +29,7 @@ export const analyzePromptWithClaude = async (
     
     console.log("Sending request to Anthropic Claude API using SDK...");
     const response = await anthropic.messages.create({
-      model: "claude-3-sonnet-20240229",
+      model: "claude-3-opus-20240229", // Updated to use the latest model
       max_tokens: 4000,
       temperature: 0.2,
       system: systemPrompt,
@@ -44,11 +44,15 @@ export const analyzePromptWithClaude = async (
     if (response.content && response.content.length > 0) {
       const contentBlock = response.content[0];
       
-      // Check if the content block is a text block (not a tool use block)
+      // Check if the content block is a text block
       if (contentBlock.type === 'text') {
         return parseClaudeResponse({ 
           content: [{ type: 'text', text: contentBlock.text }] 
         });
+      } else {
+        // Handle other content types (tool use, etc.)
+        console.warn("Received non-text content type:", contentBlock.type);
+        return handleApiError(new Error(`Unsupported content type: ${contentBlock.type}`));
       }
     }
     

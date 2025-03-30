@@ -14,9 +14,9 @@ export async function validateClaudeApiKey(apiKey: string): Promise<{valid: bool
       dangerouslyAllowBrowser: true,
     });
     
-    // Make a test request to validate the key
+    // Make a test request to validate the key - using the latest model
     const response = await anthropic.messages.create({
-      model: "claude-3-sonnet-20240229",
+      model: "claude-3-opus-20240229",  // Updated to use the latest model
       max_tokens: 10,
       messages: [
         { role: "user", content: "Hello, this is a test message to validate the API key." }
@@ -61,7 +61,7 @@ export async function validateOpenAIApiKey(apiKey: string): Promise<{valid: bool
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",  // Updated to use gpt-4o-mini instead of gpt-3.5-turbo
         messages: [
           {
             role: "user",
@@ -96,11 +96,11 @@ export async function validateOpenAIApiKey(apiKey: string): Promise<{valid: bool
  * Extracts API keys from environment variables or configuration
  */
 export function getApiKeys(): { claude: string | null; openai: string | null } {
-  // Get the Claude API key - updated to use the new key
-  const claudeKey = "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";
+  // Note: You should replace these with your actual API keys
+  const claudeKey = null; // Remove hardcoded API key for security
   
   // Get the OpenAI API key
-  const openaiKey = "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";
+  const openaiKey = null; // Remove hardcoded API key for security
   
   return {
     claude: claudeKey,
@@ -122,11 +122,11 @@ export async function checkApiKeys(): Promise<{
   
   const claudeResult = keys.claude 
     ? await validateClaudeApiKey(keys.claude)
-    : { valid: false, message: "Claude API key not found" };
+    : { valid: false, message: "Claude API key not found. Please enter a valid API key in your settings." };
     
   const openaiResult = keys.openai
     ? await validateOpenAIApiKey(keys.openai)
-    : { valid: false, message: "OpenAI API key not found" };
+    : { valid: false, message: "OpenAI API key not found. Please enter a valid API key in your settings." };
     
   return {
     claude: claudeResult,

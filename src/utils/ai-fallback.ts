@@ -23,12 +23,17 @@ export const processWithFallbackAI = async (
     console.log("Attempting direct Claude API call...");
     const { analyzePromptWithClaude } = await import('@/services/anthropic-service');
     
+    if (!apiKeys.claude) {
+      console.warn("No Claude API key provided, skipping Claude fallback");
+      throw new Error("Claude API key not found");
+    }
+    
     // Process the prompt with Claude API
     const analysisResult = await analyzePromptWithClaude(
       prompt, 
       track1Features, 
       track2Features,
-      apiKeys.claude || ''
+      apiKeys.claude
     );
     
     // If successful, use the Claude results
@@ -59,11 +64,11 @@ export const processWithFallbackAI = async (
         
       } catch (openaiError) {
         console.error("OpenAI API fallback failed:", openaiError);
-        throw new Error("Both Claude and OpenAI direct API calls failed");
+        throw new Error("Both Claude and OpenAI direct API calls failed. Please check your API keys and try again.");
       }
     } else {
       // No OpenAI key, rethrow Claude error
-      throw claudeError;
+      throw new Error("No valid API keys found. Please add your Claude or OpenAI API key in settings.");
     }
   }
 };
