@@ -4,8 +4,8 @@ import { PromptAnalysisResult } from '@/services/anthropic-service';
 import { AudioFeatures } from '@/types/audio';
 
 // API keys for direct fallback (first Claude, then OpenAI if Claude fails)
-const CLAUDE_API_KEY = "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";
-const OPENAI_API_KEY = "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";
+const CLAUDE_API_KEY = "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";
+const OPENAI_API_KEY = "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";
 
 /**
  * Fallback to direct Claude API if backend is not available

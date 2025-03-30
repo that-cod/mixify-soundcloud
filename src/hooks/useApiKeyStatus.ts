@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { checkApiKeys } from '@/utils/api-key-validator';
 
 interface ApiKeyStatus {
@@ -7,38 +7,46 @@ interface ApiKeyStatus {
   openai: { valid: boolean; message: string } | null;
   isChecking: boolean;
   error: string | null;
+  checkKeys: () => Promise<void>;
 }
 
-export function useApiKeyStatus() {
-  const [status, setStatus] = useState<ApiKeyStatus>({
+export function useApiKeyStatus(): ApiKeyStatus {
+  const [status, setStatus] = useState<Omit<ApiKeyStatus, 'checkKeys'>>({
     claude: null,
     openai: null,
     isChecking: true,
     error: null
   });
 
-  useEffect(() => {
-    const validateKeys = async () => {
-      try {
-        const result = await checkApiKeys();
-        setStatus({
-          claude: result.claude,
-          openai: result.openai,
-          isChecking: false,
-          error: null
-        });
-      } catch (error) {
-        setStatus({
-          claude: null,
-          openai: null,
-          isChecking: false,
-          error: error instanceof Error ? error.message : 'Unknown error checking API keys'
-        });
-      }
-    };
-
-    validateKeys();
+  const validateKeys = useCallback(async () => {
+    setStatus(prev => ({ ...prev, isChecking: true, error: null }));
+    try {
+      console.log("Checking API keys...");
+      const result = await checkApiKeys();
+      console.log("API key check result:", result);
+      setStatus({
+        claude: result.claude,
+        openai: result.openai,
+        isChecking: false,
+        error: null
+      });
+    } catch (error) {
+      console.error("Error checking API keys:", error);
+      setStatus({
+        claude: null,
+        openai: null,
+        isChecking: false,
+        error: error instanceof Error ? error.message : 'Unknown error checking API keys'
+      });
+    }
   }, []);
 
-  return status;
+  useEffect(() => {
+    validateKeys();
+  }, [validateKeys]);
+
+  return {
+    ...status,
+    checkKeys: validateKeys
+  };
 }

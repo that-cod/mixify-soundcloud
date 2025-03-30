@@ -1,30 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { checkApiKeys } from '@/utils/api-key-validator';
+import { Button } from '@/components/ui/button';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 
 export const ApiKeyStatus: React.FC = () => {
-  const [isChecking, setIsChecking] = useState(false);
-  const [claudeStatus, setClaudeStatus] = useState<{valid: boolean; message: string} | null>(null);
-  const [openaiStatus, setOpenaiStatus] = useState<{valid: boolean; message: string} | null>(null);
-  
-  useEffect(() => {
-    const checkKeys = async () => {
-      setIsChecking(true);
-      try {
-        const result = await checkApiKeys();
-        setClaudeStatus(result.claude);
-        setOpenaiStatus(result.openai);
-      } catch (error) {
-        console.error("Error checking API keys:", error);
-      } finally {
-        setIsChecking(false);
-      }
-    };
-    
-    checkKeys();
-  }, []);
+  const { claude, openai, isChecking, error, checkKeys } = useApiKeyStatus();
   
   const renderStatus = (status: {valid: boolean; message: string} | null, name: string) => {
     if (!status) {
@@ -55,11 +38,22 @@ export const ApiKeyStatus: React.FC = () => {
   
   return (
     <Card className="glass-card mt-4">
-      <CardHeader>
-        <CardTitle>API Key Status</CardTitle>
-        <CardDescription>
-          Check if the API keys used for AI mixing are valid and working
-        </CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>API Key Status</CardTitle>
+          <CardDescription>
+            Check if the API keys used for AI mixing are valid and working
+          </CardDescription>
+        </div>
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={checkKeys} 
+          disabled={isChecking}
+          title="Refresh API key status"
+        >
+          <RefreshCw className={`h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {isChecking ? (
@@ -71,12 +65,21 @@ export const ApiKeyStatus: React.FC = () => {
           <div className="space-y-3">
             <div className="p-3 rounded-md bg-white/5">
               <h3 className="text-sm font-medium mb-2">Anthropic Claude API</h3>
-              {renderStatus(claudeStatus, "Claude")}
+              {renderStatus(claude, "Claude")}
             </div>
             
             <div className="p-3 rounded-md bg-white/5">
               <h3 className="text-sm font-medium mb-2">OpenAI API</h3>
-              {renderStatus(openaiStatus, "OpenAI")}
+              {renderStatus(openai, "OpenAI")}
+            </div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div className="flex items-start">
+              <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
             </div>
           </div>
         )}

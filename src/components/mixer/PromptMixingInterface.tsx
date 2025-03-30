@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Lightbulb, PenTool, Check, CheckCircle2, Info } from 'lucide-react';
+import { Loader2, Lightbulb, PenTool, Check, CheckCircle2, Info, AlertCircle } from 'lucide-react';
 import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 
 interface AudioFeatures {
   bpm: number;
@@ -23,7 +24,6 @@ interface PromptMixingInterfaceProps {
   promptAnalysisResult?: PromptAnalysisResult | null;
   onPromptSubmit: (prompt: string) => void;
   onApplyAndMix?: () => void;
-  hasApiKey?: boolean;
 }
 
 export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
@@ -36,10 +36,12 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
   promptAnalysisResult,
   onPromptSubmit,
   onApplyAndMix,
-  hasApiKey = true, // Default to true since we have hardcoded API keys
 }) => {
   const [prompt, setPrompt] = useState("");
   const [showExamples, setShowExamples] = useState(false);
+  const { claude, openai, isChecking } = useApiKeyStatus();
+
+  const hasValidApiKey = (claude && claude.valid) || (openai && openai.valid);
 
   const examplePrompts = [
     `Mix ${track1Name} and ${track2Name} with equal vocal levels and adjust to 128 BPM`,
@@ -102,6 +104,28 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
     );
   };
 
+  // Show API key warning if no valid keys are found
+  const renderApiKeyWarning = () => {
+    if (isChecking) return null;
+    if (hasValidApiKey) return null;
+    
+    return (
+      <div className="rounded-md bg-yellow-500/10 border border-yellow-500/30 p-3 mb-4">
+        <div className="flex items-start">
+          <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 mt-0.5" />
+          <div>
+            <p className="text-sm text-yellow-400">API Key Issue Detected</p>
+            <p className="text-xs text-yellow-300/80 mt-1">
+              No valid AI API keys found. AI-powered mixing may not work correctly.
+              {claude && !claude.valid && <span className="block mt-1">Claude API: {claude.message}</span>}
+              {openai && !openai.valid && <span className="block mt-1">OpenAI API: {openai.message}</span>}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Card className="glass-card">
       <CardHeader>
@@ -114,6 +138,9 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* API key status warning */}
+        {renderApiKeyWarning()}
+
         {/* Add message about API key for hackathon */}
         <div className="rounded-md bg-green-500/10 border border-green-500/30 p-3 mb-4">
           <div className="flex items-start">
@@ -194,7 +221,7 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
                   </Button>
                   <Button 
                     onClick={handleSubmit} 
-                    disabled={!prompt.trim() || !track1Features || !track2Features}
+                    disabled={!prompt.trim() || !track1Features || !track2Features || (!hasValidApiKey && !isChecking)}
                     className="bg-mixify-purple hover:bg-mixify-purple-dark"
                   >
                     Generate Mix
