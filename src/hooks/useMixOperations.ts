@@ -34,6 +34,7 @@ export const useMixOperations = ({
   const [isMixing, setIsMixing] = useState(false);
   const [mixProgress, setMixProgress] = useState(0);
   const [mixedTrackUrl, setMixedTrackUrl] = useState<string | undefined>();
+  const [lastMixError, setLastMixError] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Check for precomputed operations
@@ -66,6 +67,9 @@ export const useMixOperations = ({
       return false;
     }
     
+    // Reset error state
+    setLastMixError(null);
+    
     try {
       setIsMixing(true);
       setMixProgress(0);
@@ -73,21 +77,6 @@ export const useMixOperations = ({
       // Check if we have precomputed operations for the first track
       const track1Id = track1Url.split('/').pop() || '';
       const precomputedOps = getMixPrecomputedOps(track1Id);
-      
-      // If we have precomputed operations and requested bpm is in cache, use it
-      if (
-        precomputedOps && 
-        mixSettings.bpmMatch && 
-        track2Features && 
-        track2Features.bpm
-      ) {
-        const targetBpm = Math.round(track2Features.bpm).toString();
-        if (precomputedOps.bpmVariants[targetBpm]) {
-          console.log(`Using precomputed BPM variant: ${targetBpm}`);
-          // Use precomputed variant
-          // You would normally set this in the request to the mixing API
-        }
-      }
       
       // Create mix request payload
       const payload = {
@@ -108,6 +97,16 @@ export const useMixOperations = ({
         usePrecomputed: !!precomputedOps
       };
       
+      console.log("Starting mix with payload:", JSON.stringify(payload, null, 2));
+      
+      // Add progress simulation for better UX
+      const progressInterval = setInterval(() => {
+        setMixProgress(prev => {
+          const newProgress = prev + 2;
+          return newProgress < 90 ? newProgress : prev;
+        });
+      }, 500);
+      
       // Start the mix
       const response = await axios.post(API.endpoints.mix, payload, {
         onUploadProgress: (progressEvent) => {
@@ -118,14 +117,24 @@ export const useMixOperations = ({
         }
       });
       
+      // Clear progress simulation
+      clearInterval(progressInterval);
+      
       // Handle successful response
       setMixProgress(100);
-      setMixedTrackUrl(response.data.mixedTrackUrl);
       
-      toast({
-        title: "Mix Complete",
-        description: "Your tracks have been mixed successfully!",
-      });
+      if (response.data.mixedTrackPath) {
+        const fullUrl = `${window.location.origin}${response.data.mixedTrackPath}`;
+        console.log("Mix successful, track URL:", fullUrl);
+        setMixedTrackUrl(response.data.mixedTrackPath);
+        
+        toast({
+          title: "Mix Complete",
+          description: "Your tracks have been mixed successfully!",
+        });
+      } else {
+        throw new Error("Missing mixed track URL in response");
+      }
       
       // Store precomputed operations if provided in response
       if (response.data.precomputedOperations) {
@@ -136,10 +145,25 @@ export const useMixOperations = ({
     } catch (error: any) {
       console.error('Mix error:', error);
       
+      // Extract the most useful error message
+      let errorMessage = "An error occurred while mixing. Please try again.";
+      
+      if (error.response?.data?.details) {
+        errorMessage = error.response.data.details;
+        console.error('Server error details:', error.response.data.details);
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Save the error message
+      setLastMixError(errorMessage);
+      
       // Show error toast
       toast({
         title: "Mix Failed",
-        description: error.response?.data?.error || "An error occurred while mixing. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       
@@ -154,6 +178,7 @@ export const useMixOperations = ({
     isMixing,
     mixProgress,
     mixedTrackUrl,
+    lastMixError,
     handleMix
   };
 };

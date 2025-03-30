@@ -33,12 +33,11 @@ export function useApiKeyStatus(): ApiKeyStatus {
       });
     } catch (error) {
       console.error("Error checking API keys:", error);
-      setStatus({
-        claude: null,
-        openai: null,
+      setStatus(prev => ({
+        ...prev,
         isChecking: false,
         error: error instanceof Error ? error.message : 'Unknown error checking API keys'
-      });
+      }));
     }
   }, []);
 
@@ -47,7 +46,7 @@ export function useApiKeyStatus(): ApiKeyStatus {
   }, [validateKeys]);
 
   // Calculate if any key is valid - using explicit comparison for safety
-  const anyKeyValid = (status.claude?.valid === true || status.openai?.valid === true);
+  const anyKeyValid = Boolean(status.claude?.valid === true || status.openai?.valid === true);
 
   return {
     ...status,

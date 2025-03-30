@@ -41,7 +41,7 @@ export const processWithFallbackAI = async (
         // Fall through to OpenAI if Claude fails
       }
     } else {
-      console.warn("No Claude API key provided, skipping Claude fallback");
+      console.log("No Claude API key provided, skipping Claude fallback");
     }
     
     // Try OpenAI if Claude failed or no Claude key was provided
@@ -65,14 +65,15 @@ export const processWithFallbackAI = async (
         
       } catch (openaiError) {
         console.error("OpenAI API call failed:", openaiError);
-        throw new Error("Both Claude and OpenAI direct API calls failed. Please check your API keys and try again.");
+        throw new Error("All AI direct API calls failed. Please check your API keys and try again.");
       }
     } else {
+      console.log("No OpenAI key provided");
       // No OpenAI key, and Claude has already failed or was not provided
       throw new Error("No valid API keys found. Please add your Claude or OpenAI API key in settings.");
     }
   } catch (error) {
     console.error("All AI fallback methods failed:", error);
-    throw new Error("AI processing failed. Please check your API keys and try again.");
+    throw error; // Re-throw to allow caller to handle
   }
 };

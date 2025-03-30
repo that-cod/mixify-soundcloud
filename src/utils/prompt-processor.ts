@@ -28,6 +28,7 @@ export const processPromptMix = async (
   
   try {
     // Process the prompt using the backend API
+    console.log("Attempting backend prompt processing...");
     const response = await axios.post(API.endpoints.processPrompt, {
       prompt,
       track1Features,
@@ -38,16 +39,23 @@ export const processPromptMix = async (
     onProgress(100);
     
     // Extract analysis result from response
+    if (!response.data.analysis) {
+      console.error("Invalid response from server - missing analysis data", response.data);
+      throw new Error("Server returned invalid data. Trying fallback method...");
+    }
+    
     const analysisResult: PromptAnalysisResult = response.data.analysis;
+    console.log("Received analysis from server:", analysisResult);
     
     // Process the results
     return processResults(analysisResult, "Server");
     
   } catch (error) {
-    console.error("Error processing prompt:", error);
+    console.error("Error processing prompt with backend:", error);
     clearInterval(progressInterval);
     
     // Try fallback to the direct AI API
+    console.log("Attempting fallback to direct AI APIs...");
     try {
       return await processWithFallbackAI(
         prompt, 
@@ -56,9 +64,9 @@ export const processPromptMix = async (
         processResults
       );
     } catch (fallbackError) {
-      console.error("Fallback prompt processing failed:", fallbackError);
+      console.error("All prompt processing methods failed:", fallbackError);
       onProgress(0);
-      return false;
+      throw fallbackError; // Re-throw to allow caller to handle
     }
   }
 };

@@ -24,35 +24,47 @@ export const usePromptProcessing = ({
   const [isProcessingPrompt, setIsProcessingPrompt] = useState(false);
   const [promptProcessProgress, setPromptProcessProgress] = useState(0);
   const [promptAnalysisResult, setPromptAnalysisResult] = useState<PromptAnalysisResult | null>(null);
+  const [promptProcessError, setPromptProcessError] = useState<string | null>(null);
   
   const { toast } = useToast();
-  const { claude, openai } = useApiKeyStatus();
+  const { anyKeyValid } = useApiKeyStatus();
   
-  // Check if at least one API key is valid
-  const anyKeyValid = (claude?.valid === true || openai?.valid === true);
-
   // Handler to process analysis results from any AI service
   const processAnalysisResult = (analysisResult: PromptAnalysisResult, source: string): boolean => {
-    // Save the analysis result
-    setPromptAnalysisResult(analysisResult);
-    
-    // Apply the AI-suggested settings
-    updateMixSettings(analysisResult.recommendedSettings);
-    
-    // If additional instruction processing is available, use it
-    if (applyPromptInstructions) {
-      applyPromptInstructions(analysisResult);
+    try {
+      // Save the analysis result
+      setPromptAnalysisResult(analysisResult);
+      
+      console.log(`Processing analysis result from ${source}:`, analysisResult);
+      
+      // Apply the AI-suggested settings
+      if (analysisResult.recommendedSettings) {
+        updateMixSettings(analysisResult.recommendedSettings);
+      } else {
+        console.warn("Missing recommendedSettings in AI analysis result");
+      }
+      
+      // If additional instruction processing is available, use it
+      if (applyPromptInstructions) {
+        applyPromptInstructions(analysisResult);
+      }
+      
+      // Display the results to the user
+      toast({
+        title: source === "Server" ? "Analysis Complete" : `Analysis Complete (${source} Fallback Mode)`,
+        description: analysisResult.summary || `AI has determined the optimal mix settings based on your prompt! ${source !== "Server" ? `(processed by ${source})` : ""}`,
+      });
+      
+      setIsProcessingPrompt(false);
+      setPromptProcessProgress(100);
+      setPromptProcessError(null);
+      return true;
+    } catch (error) {
+      console.error("Error processing analysis result:", error);
+      setPromptProcessError("Failed to process AI analysis results");
+      setIsProcessingPrompt(false);
+      return false;
     }
-    
-    // Display the results to the user
-    toast({
-      title: source === "Server" ? "Analysis Complete" : `Analysis Complete (${source} Fallback Mode)`,
-      description: analysisResult.summary || `AI has determined the optimal mix settings based on your prompt! ${source !== "Server" ? `(processed by ${source})` : ""}`,
-    });
-    
-    setIsProcessingPrompt(false);
-    setPromptProcessProgress(100);
-    return true;
   };
 
   // Function to handle AI prompt-based mixing
@@ -76,37 +88,54 @@ export const usePromptProcessing = ({
     }
     
     setIsProcessingPrompt(true);
+    setPromptProcessProgress(0);
+    setPromptProcessError(null);
     
     toast({
       title: "Processing your prompt",
       description: "Analyzing your instructions to create the perfect mix...",
     });
 
-    const success = await processPromptMix(
-      prompt,
-      track1Features,
-      track2Features,
-      setPromptProcessProgress,
-      processAnalysisResult
-    );
-    
-    if (!success) {
+    try {
+      const success = await processPromptMix(
+        prompt,
+        track1Features,
+        track2Features,
+        setPromptProcessProgress,
+        processAnalysisResult
+      );
+      
+      if (!success) {
+        throw new Error("Failed to process your instructions");
+      }
+      
+      return success;
+    } catch (error) {
+      console.error("Prompt processing error:", error);
+      
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Failed to process your instructions. Please try again.";
+      
+      setPromptProcessError(errorMessage);
+      
       toast({
         title: "Prompt Processing Failed",
-        description: "Failed to process your instructions. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
+      
       setIsProcessingPrompt(false);
       setPromptProcessProgress(0);
+      return false;
     }
-    
-    return success;
   };
 
   return {
     isProcessingPrompt,
     promptProcessProgress,
     promptAnalysisResult,
+    promptProcessError,
     handlePromptMix,
     getInstructionInsights: () => getInstructionInsights(promptAnalysisResult),
     hasValidApiKey: anyKeyValid
