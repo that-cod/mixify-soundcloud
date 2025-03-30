@@ -17,36 +17,51 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const { toast } = useToast();
 
+  // Reset states when URL changes
   useEffect(() => {
-    // Create audio element for playback when preview URL changes
-    if (previewUrl && audioRef.current) {
-      audioRef.current.src = previewUrl;
-      audioRef.current.load();
+    if (previewUrl) {
       setIsLoaded(false);
-      
-      // Reset playing state when URL changes
+      setLoadError(false);
       setIsPlaying(false);
     }
   }, [previewUrl]);
-  
-  // Handle audio events
+
+  // Handle audio element setup
   useEffect(() => {
+    // Create audio element for playback when preview URL changes
+    if (!previewUrl) return;
+    
     const audio = audioRef.current;
     if (!audio) return;
     
-    const handleCanPlay = () => setIsLoaded(true);
-    const handleEnded = () => setIsPlaying(false);
+    // Set up audio
+    audio.src = previewUrl;
+    audio.load();
+    
+    // Handle audio events
+    const handleCanPlay = () => {
+      console.log("Audio can play:", previewUrl);
+      setIsLoaded(true);
+      setLoadError(false);
+    };
+    
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+    
     const handleError = (e: Event) => {
-      console.error("Audio error:", e);
-      toast({
-        title: "Audio Error",
-        description: "There was a problem loading the audio file.",
-        variant: "destructive",
-      });
+      console.error("Audio error loading:", previewUrl, e);
+      setLoadError(true);
       setIsLoaded(false);
       setIsPlaying(false);
+      toast({
+        title: "Audio Error",
+        description: "There was a problem loading the audio file. Please try again.",
+        variant: "destructive",
+      });
     };
     
     audio.addEventListener('canplay', handleCanPlay);
@@ -57,31 +72,42 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
       audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
+      audio.pause();
     };
-  }, [toast]);
+  }, [previewUrl, toast]);
   
   // Handle play/pause
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !isLoaded) return;
     
     if (isPlaying) {
-      audio.play().catch(err => {
-        console.error("Error playing audio:", err);
-        toast({
-          title: "Playback Error",
-          description: "Could not play the audio. Please try again.",
-          variant: "destructive",
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.error("Error playing audio:", err);
+          toast({
+            title: "Playback Error",
+            description: "Could not play the audio. Please try again.",
+            variant: "destructive",
+          });
+          setIsPlaying(false);
         });
-        setIsPlaying(false);
-      });
+      }
     } else {
       audio.pause();
     }
-  }, [isPlaying, toast]);
+  }, [isPlaying, isLoaded, toast]);
   
   const togglePlayback = () => {
-    setIsPlaying(!isPlaying);
+    if (isLoaded) {
+      setIsPlaying(!isPlaying);
+    } else if (previewUrl && !loadError) {
+      // If not loaded yet but URL exists and no error, try to load again
+      if (audioRef.current) {
+        audioRef.current.load();
+      }
+    }
   };
   
   const downloadTrack = () => {
@@ -95,6 +121,7 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
     }
   };
 
+  // If no preview URL is provided, show nothing
   if (!previewUrl) {
     return null;
   }
@@ -102,24 +129,29 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
   return (
     <div className="mb-4">
       <h4 className="text-sm font-medium mb-2">Stage Preview</h4>
+      
+      {/* Always show waveform regardless of load state */}
       <WaveformDisplay 
         audioUrl={previewUrl} 
         height={60}
         color="#9b87f5"
       />
+      
+      {/* Audio element */}
       <audio 
         ref={audioRef} 
         style={{ display: 'none' }} 
         preload="auto"
       />
       
+      {/* Controls section */}
       {showControls && (
         <div className="flex gap-2 mt-3">
           <Button
             variant="outline"
             size="sm"
             onClick={togglePlayback}
-            disabled={!isLoaded}
+            disabled={loadError}
           >
             {isPlaying ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
             {isPlaying ? 'Pause' : 'Play'}
@@ -129,11 +161,18 @@ export const StagePreview: React.FC<StagePreviewProps> = ({
             variant="outline"
             size="sm"
             onClick={downloadTrack}
-            disabled={!isLoaded}
+            disabled={loadError}
           >
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
+        </div>
+      )}
+      
+      {/* Error message when load fails */}
+      {loadError && (
+        <div className="text-destructive text-sm mt-2">
+          Failed to load audio preview. The mixing process may not have completed correctly.
         </div>
       )}
     </div>
