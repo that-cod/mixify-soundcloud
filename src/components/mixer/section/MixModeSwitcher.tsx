@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Sparkles, GitBranch } from 'lucide-react';
+import { Sparkles, GitBranch, Sliders, Wand2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MixModeSwitcherProps {
   mixMode: 'manual' | 'prompt';
@@ -28,30 +29,51 @@ export const MixModeSwitcher: React.FC<MixModeSwitcherProps> = ({
         <Button
           variant={mixMode === 'manual' ? 'default' : 'outline'}
           onClick={() => setMixMode('manual')}
-          className={mixMode === 'manual' ? 'bg-mixify-purple hover:bg-mixify-purple-dark' : ''}
+          className={`flex items-center ${mixMode === 'manual' ? 'bg-mixify-purple hover:bg-mixify-purple-dark' : ''}`}
         >
+          <Sliders className="mr-2 h-4 w-4" />
           Manual Mix
         </Button>
-        <Button
-          variant={mixMode === 'prompt' ? 'default' : 'outline'}
-          onClick={() => setMixMode('prompt')}
-          className={mixMode === 'prompt' ? 'bg-mixify-purple hover:bg-mixify-purple-dark' : ''}
-        >
-          <Sparkles className="mr-2 h-4 w-4" />
-          AI Prompt Mix
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={mixMode === 'prompt' ? 'default' : 'outline'}
+                onClick={() => setMixMode('prompt')}
+                className={`flex items-center ${mixMode === 'prompt' ? 'bg-mixify-purple hover:bg-mixify-purple-dark' : ''}`}
+              >
+                <Wand2 className="mr-2 h-4 w-4" />
+                AI Prompt Mix
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Describe how you want your mix to sound in plain language</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       
       <div className="flex items-center justify-center">
-        <Button
-          variant="outline"
-          onClick={toggleMixingMode}
-          className="text-xs"
-          size="sm"
-        >
-          <GitBranch className="mr-2 h-3 w-3" />
-          {mixingMode === 'standard' ? 'Switch to Multi-Stage Mixing' : 'Switch to Standard Mixing'}
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={toggleMixingMode}
+                className="text-xs"
+                size="sm"
+              >
+                <GitBranch className="mr-2 h-3 w-3" />
+                {mixingMode === 'standard' ? 'Switch to Multi-Stage Mixing' : 'Switch to Standard Mixing'}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{mixingMode === 'standard' 
+                ? 'Multi-stage mixing gives you control at each step of the mixing process' 
+                : 'Standard mixing creates your mix in one go'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );
