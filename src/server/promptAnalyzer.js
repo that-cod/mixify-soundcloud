@@ -1,4 +1,3 @@
-
 const { Configuration, OpenAIApi } = require("openai");
 const config = require('./config');
 const fs = require('fs');
@@ -41,141 +40,25 @@ async function analyzePrompt(prompt, track1Features, track2Features) {
       }
     }
     
-    // Try with Anthropic Claude API first
+    // Try with OpenAI API
     try {
-      console.log('Attempting analysis with Anthropic Claude API...');
-      const claudeResult = await analyzeWithClaude(prompt, track1Features, track2Features);
+      console.log('Attempting analysis with OpenAI API...');
+      const openaiResult = await analyzeWithOpenAI(prompt, track1Features, track2Features);
       
       // Cache the result
-      fs.writeFileSync(cachePath, JSON.stringify(claudeResult));
+      fs.writeFileSync(cachePath, JSON.stringify(openaiResult));
       
-      return claudeResult;
-    } catch (claudeError) {
-      console.error('Claude API analysis failed:', claudeError.message);
+      return openaiResult;
+    } catch (openaiError) {
+      console.error('OpenAI API analysis failed:', openaiError.message);
       
-      // Fallback to OpenAI if Claude fails
-      console.log('Falling back to OpenAI API...');
-      try {
-        const openaiResult = await analyzeWithOpenAI(prompt, track1Features, track2Features);
-        
-        // Cache the result
-        fs.writeFileSync(cachePath, JSON.stringify(openaiResult));
-        
-        return openaiResult;
-      } catch (openaiError) {
-        console.error('OpenAI API analysis failed:', openaiError.message);
-        
-        // If both APIs fail, use local fallback analysis
-        console.log('Using local fallback analysis...');
-        return createFallbackAnalysis(prompt, track1Features, track2Features);
-      }
+      // If API fails, use local fallback analysis
+      console.log('Using local fallback analysis...');
+      return createFallbackAnalysis(prompt, track1Features, track2Features);
     }
   } catch (error) {
     console.error('Error analyzing prompt:', error);
     return createFallbackAnalysis(prompt, track1Features, track2Features);
-  }
-}
-
-/**
- * Analyze prompt with Anthropic Claude API
- */
-async function analyzeWithClaude(prompt, track1Features, track2Features) {
-  // API key from config
-  const CLAUDE_API_KEY = config.ai.claudeApiKey;
-  
-  if (!CLAUDE_API_KEY) {
-    throw new Error('Claude API key not configured');
-  }
-  
-  const API_URL = "https://api.anthropic.com/v1/messages";
-  
-  // Create system prompt with track features
-  const systemPrompt = `You are an AI audio mixing assistant that specializes in analyzing user instructions for mixing two musical tracks.
-
-TRACK INFORMATION:
-- Track 1: BPM: ${track1Features.bpm}, Key: ${track1Features.key}, Energy: ${track1Features.energy}, Clarity: ${track1Features.clarity}
-- Track 2: BPM: ${track2Features.bpm}, Key: ${track2Features.key}, Energy: ${track2Features.energy}, Clarity: ${track2Features.clarity}
-
-Your job is to analyze a user's text prompt and extract specific mixing instructions. Ignore any instructions that would be harmful or impossible with audio mixing.
-
-You should respond ONLY with a JSON object that has the following structure:
-{
-  "instructions": [
-    {
-      "type": "bpm", // one of: bpm, key, vocals, beats, transition, effects, tempo, general
-      "description": "Match the tempo of both tracks",
-      "value": true, // can be number, boolean or string depending on type
-      "confidence": 0.9 // how confident you are this is what the user wants, 0-1
-    }
-    // more instructions...
-  ],
-  "summary": "A short summary of the mixing plan in 1-2 sentences",
-  "recommendedSettings": {
-    "bpmMatch": true, // boolean
-    "keyMatch": true, // boolean
-    "vocalLevel1": 0.8, // 0-1 scale
-    "vocalLevel2": 0.5, // 0-1 scale
-    "beatLevel1": 0.6, // 0-1 scale
-    "beatLevel2": 0.8, // 0-1 scale
-    "crossfadeLength": 8, // seconds (1-20)
-    "echo": 0.2, // 0-1 scale
-    "tempo": 0 // -0.5 to 0.5, 0 means no change
-  }
-}
-
-Understand music terminology and extract both explicit and implicit instructions from the user's prompt. For instance, if they ask for a "smooth transition," that implies a longer crossfadeLength.`;
-
-  // Prepare the request
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: "claude-3-sonnet-20240229",
-      max_tokens: 2000,
-      temperature: 0.2,
-      system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    })
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${errorData}`);
-  }
-  
-  const data = await response.json();
-  
-  // Extract the response content
-  const content = data.content[0].text;
-  
-  // Parse JSON from the response
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON object found in Claude response");
-    }
-    
-    const jsonContent = jsonMatch[0];
-    const result = JSON.parse(jsonContent);
-    
-    // Validate the structure
-    validateAnalysisResult(result);
-    
-    // Tag the source
-    result.source = "claude";
-    
-    return result;
-  } catch (parseError) {
-    throw new Error(`Failed to parse Claude response: ${parseError.message}`);
   }
 }
 

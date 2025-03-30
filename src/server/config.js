@@ -21,7 +21,6 @@ PORT=5000
 NODE_ENV=development
 
 # API Keys (replace with your own)
-CLAUDE_API_KEY="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"
 OPENAI_API_KEY="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"
 
 # File storage configuration
@@ -53,8 +52,7 @@ const config = {
     }
   },
   
-  apiKeys: {
-    claude: process.env.CLAUDE_API_KEY || "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",
+  ai: {
     openai: process.env.OPENAI_API_KEY || "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",
   },
   
