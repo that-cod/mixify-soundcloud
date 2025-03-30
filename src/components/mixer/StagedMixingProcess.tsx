@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MixingStage, StageStatus, StagedMixSettings } from './staged/types';
 import { MIXING_STAGES } from './staged/mixingStages';
@@ -9,6 +9,7 @@ import { StageControls } from './staged/StageControls';
 import { StagePreview } from './staged/StagePreview';
 import { PlaybackControls } from './PlaybackControls';
 import { formatParamLabel } from './staged/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface StagedMixingProcessProps {
   track1Url: string | undefined;
@@ -34,6 +35,8 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
   const [overallProgress, setOverallProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { toast } = useToast();
   
   // Get current stage info
   const currentStageInfo = MIXING_STAGES.find(stage => stage.id === currentStage) || MIXING_STAGES[0];
@@ -45,6 +48,32 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
       [param]: value
     }));
   };
+  
+  // Effect to handle playback
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(err => {
+          console.error("Error playing audio:", err);
+          toast({
+            title: "Playback Error",
+            description: "Could not play the audio. Please try again.",
+            variant: "destructive",
+          });
+          setIsPlaying(false);
+        });
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  // Update volume when it changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
   
   // Handlers for process control
   const handleStartStage = () => {
@@ -88,8 +117,12 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
   };
   
   const restartPlayback = () => {
-    // Implementation would restart audio playback
-    console.log('Restarting playback');
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      if (!isPlaying) {
+        setIsPlaying(true);
+      }
+    }
   };
   
   // Simulate stage progress (in a real implementation, this would be real-time feedback from the mixing process)
@@ -109,25 +142,37 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
         clearInterval(interval);
         
         // Set stage preview URL (simulated)
-        const previewUrl = currentStage === 'finalMix' 
-          ? track1Url // Just for demo, in real implementation this would be a real preview
-          : track1Url;
-          
-        setStagePreviewUrl(previewUrl);
-        setStageStatus('complete');
-        
-        // Automatically proceed to next stage if not the final stage
-        if (currentStage !== 'finalMix') {
-          setTimeout(() => handleSkipToNextStage(), 1000);
+        let previewUrl;
+        if (currentStage === 'finalMix') {
+          // Use track1Url as the final mix result (in a real implementation, this would be the actual mixed track)
+          previewUrl = track1Url;
+          // Show success toast
+          toast({
+            title: "Final Mix Complete",
+            description: "Your tracks have been successfully mixed!",
+          });
         } else {
-          // If this is the final stage, mark as complete
-          setTimeout(() => {
-            setCurrentStage('complete');
-            setOverallProgress(100);
-            if (track1Url) {
-              onComplete(track1Url); // In real implementation, use the actual mixed URL
-            }
-          }, 1000);
+          // For other stages, use track1Url as a preview
+          previewUrl = track1Url;
+        }
+        
+        if (previewUrl) {
+          setStagePreviewUrl(previewUrl);
+          setStageStatus('complete');
+          
+          // Automatically proceed to next stage if not the final stage
+          if (currentStage !== 'finalMix') {
+            setTimeout(() => handleSkipToNextStage(), 1000);
+          } else {
+            // If this is the final stage, mark as complete
+            setTimeout(() => {
+              setCurrentStage('complete');
+              setOverallProgress(100);
+              if (previewUrl) {
+                onComplete(previewUrl); // In real implementation, use the actual mixed URL
+              }
+            }, 1000);
+          }
         }
       }
     }, 200);
@@ -158,6 +203,9 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
         
         {/* Stage preview */}
         <StagePreview previewUrl={stagePreviewUrl} />
+        
+        {/* Hidden audio element for playback */}
+        <audio ref={audioRef} src={stagePreviewUrl} style={{ display: 'none' }} />
         
         {/* Playback controls for completed mix */}
         {showPlaybackControls && stagePreviewUrl && (
