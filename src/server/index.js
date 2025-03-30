@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -27,12 +26,35 @@ function startServer() {
   const PORT = config.server.port;
 
   // Middleware
-  app.use(cors({
-    origin: config.frontend.url,
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
+  // Enable CORS with more permissive options for development
+  const corsOptions = {
+    origin: function(origin, callback) {
+      // Allow any origin in development mode
+      if (config.server.env === 'development' || !origin) {
+        return callback(null, true);
+      }
+      
+      // In production, check against allowed origins
+      const allowedOrigins = [config.frontend.url, /\.lovable(project)?\.com$/];
+      const allowed = allowedOrigins.some(allowedOrigin => {
+        return typeof allowedOrigin === 'string' 
+          ? allowedOrigin === origin
+          : allowedOrigin.test(origin);
+      });
+      
+      if (allowed) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    maxAge: 86400 // 24 hours
+  };
   
+  app.use(cors(corsOptions));
   app.use(express.json());
 
   // Ensure upload directory exists
@@ -63,6 +85,11 @@ function startServer() {
         cb(new Error('Only audio files are allowed!'), false);
       }
     }
+  });
+
+  // Simple server status check endpoint (responds to HEAD requests)
+  app.head('/api/status', (req, res) => {
+    res.status(200).end();
   });
 
   // Routes
@@ -210,13 +237,38 @@ function startServer() {
     });
   });
 
-  // Server status endpoint
+  // Server status endpoint with more details
   app.get('/api/status', (req, res) => {
     res.status(200).json({
       status: 'running',
       version: '1.0.0',
-      environment: config.server.env
+      environment: config.server.env,
+      uptime: process.uptime(),
+      system: {
+        memory: config.server.systemInfo,
+        isLowResourceSystem: config.server.isLowResourceSystem
+      }
     });
+  });
+
+  // CORS pre-flight route for all API endpoints
+  app.options('*', cors(corsOptions));
+
+  // Handle CORS errors
+  app.use((err, req, res, next) => {
+    if (err.message.includes('CORS')) {
+      console.error('CORS error:', {
+        origin: req.headers.origin,
+        method: req.method,
+        path: req.path
+      });
+      return res.status(403).json({
+        error: 'CORS error',
+        message: 'Cross-Origin Request Blocked',
+        details: 'This server only accepts requests from allowed origins'
+      });
+    }
+    next(err);
   });
 
   // Error handler middleware - add detailed error responses

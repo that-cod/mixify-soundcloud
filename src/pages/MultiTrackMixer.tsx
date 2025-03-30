@@ -17,11 +17,11 @@ const MultiTrackMixerPage: React.FC = () => {
     <MainLayout>
       <div className="w-full max-w-7xl mx-auto px-4 py-6">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Advanced Mixer Studio</h1>
-          <p className="text-white/70">Mix multiple tracks with advanced audio processing tools</p>
+          <h1 className="text-3xl font-bold text-white">Advanced Mixer Studio</h1>
+          <p className="text-white/70 mt-2">Mix multiple tracks with advanced audio processing tools</p>
         </div>
         
-        <div className="overflow-hidden rounded-lg bg-black/20 border border-white/5 p-6">
+        <div className="overflow-hidden rounded-lg bg-black/20 border border-white/5 p-6 shadow-lg">
           <MultiTrackMixer />
         </div>
       </div>

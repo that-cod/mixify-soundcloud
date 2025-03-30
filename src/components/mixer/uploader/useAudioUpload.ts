@@ -22,7 +22,42 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
   const [bucketStatus, setBucketStatus] = useState<BucketStatus | null>(null);
   const [bucketCheckInProgress, setBucketCheckInProgress] = useState(true);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'unknown'>('unknown');
   const { toast } = useToast();
+
+  // Check network status
+  useEffect(() => {
+    const updateNetworkStatus = () => {
+      setNetworkStatus(navigator.onLine ? 'online' : 'offline');
+    };
+
+    // Initialize status
+    updateNetworkStatus();
+
+    // Add event listeners
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+
+    // Check if API server is reachable
+    const checkApiServer = async () => {
+      try {
+        // Use a HEAD request to minimize data transfer
+        await axios.head(`${API.baseUrl}/api/status`, { timeout: 5000 });
+      } catch (error) {
+        console.warn('API server might be unreachable:', error);
+      }
+    };
+
+    if (navigator.onLine) {
+      checkApiServer();
+    }
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('online', updateNetworkStatus);
+      window.removeEventListener('offline', updateNetworkStatus);
+    };
+  }, []);
 
   // Check storage bucket status when component mounts
   useEffect(() => {
@@ -56,8 +91,12 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       }
     };
     
-    verifyBucketAccess();
-  }, [toast, trackNumber]);
+    if (networkStatus !== 'offline') {
+      verifyBucketAccess();
+    } else {
+      setBucketCheckInProgress(false);
+    }
+  }, [toast, trackNumber, networkStatus]);
 
   // Handle file drop
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -126,15 +165,23 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
 
   // Try backend API upload method
   const tryBackendUpload = async (file: File): Promise<{success: boolean, url?: string, error?: string}> => {
+    if (networkStatus === 'offline') {
+      return { success: false, error: "You are currently offline" };
+    }
+    
     try {
       console.log("Attempting backend API upload...");
       const formData = new FormData();
       formData.append('track', file);
       
+      // Add a longer timeout for large files
+      const timeoutMs = Math.max(30000, file.size / 10000); // At least 30 seconds
+      
       const response = await axios.post(API.endpoints.upload, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
+        timeout: timeoutMs,
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 95) / progressEvent.total);
@@ -147,9 +194,48 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       return { success: true, url: response.data.filePath };
     } catch (error: any) {
       console.error("Backend upload failed:", error?.response?.data || error.message);
-      const errorMsg = error?.response?.data?.error || error?.response?.data?.details || error.message || "Backend upload failed";
+      // Handle different axios error types
+      let errorMsg = "Backend upload failed";
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMsg = "Upload timeout - server took too long to respond";
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMsg = "Network error - please check your connection and try again";
+      } else if (error.response) {
+        // The server responded with a status code outside of 2xx range
+        errorMsg = error?.response?.data?.error || 
+                   error?.response?.data?.details || 
+                   `Server error: ${error.response.status}`;
+      } else if (error.request) {
+        // The request was made but no response was received
+        errorMsg = "No response from server - please try again later";
+      } else {
+        // Something happened in setting up the request
+        errorMsg = error.message || "Unknown upload error";
+      }
+      
       return { success: false, error: errorMsg };
     }
+  };
+
+  // Handle mock upload for testing (only when all else fails)
+  const mockUpload = async (file: File): Promise<{success: boolean, url?: string}> => {
+    // Only use in development environment
+    if (import.meta.env.DEV) {
+      return new Promise((resolve) => {
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += 10;
+          setProgress(progress);
+          if (progress >= 100) {
+            clearInterval(interval);
+            const mockUrl = `/mocks/track-${trackNumber}/${encodeURIComponent(file.name)}`;
+            resolve({ success: true, url: mockUrl });
+          }
+        }, 300);
+      });
+    }
+    return { success: false };
   };
 
   // Handle file upload
@@ -195,7 +281,25 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
         return;
       }
       
-      // If both methods fail, throw an error with details
+      // If both real methods fail, try mock in development
+      if (import.meta.env.DEV) {
+        console.log("All real upload methods failed, using mock for development...");
+        const mockResult = await mockUpload(file);
+        
+        if (mockResult.success && mockResult.url) {
+          setProgress(100);
+          onUploadComplete(mockResult.url, file.name);
+          
+          toast({
+            title: "Mock Upload",
+            description: `Track ${trackNumber} mock-uploaded for development.`,
+            variant: "warning",
+          });
+          return;
+        }
+      }
+      
+      // If all methods fail, throw an error with details
       const errorDetails = [
         backendResult.error && `Backend: ${backendResult.error}`,
         supabaseResult.error && `Storage: ${supabaseResult.error}`
@@ -211,7 +315,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       
       toast({
         title: "Upload failed",
-        description: "Could not upload file. Please try again.",
+        description: "Could not upload file. Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -234,6 +338,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
     bucketStatus,
     bucketCheckInProgress,
     uploadError,
+    networkStatus,
     onDrop,
     uploadFile,
     removeFile,

@@ -7,6 +7,7 @@ import { DropZone } from './uploader/DropZone';
 import { FilePreview } from './uploader/FilePreview';
 import { AUDIO_BUCKET } from '@/services/storage-service';
 import { AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface AudioUploaderProps {
   trackNumber: 1 | 2;
@@ -21,6 +22,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
     bucketStatus,
     bucketCheckInProgress,
     uploadError,
+    networkStatus,
     onDrop,
     uploadFile,
     removeFile,
@@ -28,6 +30,16 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
 
   return (
     <div className="space-y-4 w-full">
+      {/* Network status warning */}
+      {networkStatus === 'offline' && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          <AlertDescription>
+            You appear to be offline. Please check your internet connection.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* Bucket check loader */}
       <BucketCheckLoader isLoading={bucketCheckInProgress} />
       
@@ -56,6 +68,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
           onUpload={uploadFile}
           trackNumber={trackNumber}
           uploadError={uploadError}
+          networkStatus={networkStatus}
         />
       )}
     </div>

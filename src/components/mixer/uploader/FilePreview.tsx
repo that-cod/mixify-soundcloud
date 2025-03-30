@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Music2, X, AlertTriangle } from 'lucide-react';
+import { Music2, X, AlertTriangle, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
@@ -12,6 +12,7 @@ interface FilePreviewProps {
   onUpload: () => void;
   trackNumber: number;
   uploadError?: string | null;
+  networkStatus?: 'online' | 'offline' | 'unknown';
 }
 
 export const FilePreview: React.FC<FilePreviewProps> = ({
@@ -22,7 +23,10 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   onUpload,
   trackNumber,
   uploadError,
+  networkStatus,
 }) => {
+  const isOffline = networkStatus === 'offline';
+  
   return (
     <div className="rounded-lg border border-white/20 p-4 bg-white/5">
       <div className="flex items-center justify-between mb-2">
@@ -49,7 +53,9 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
       {uploadError && (
         <div className="mb-3 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs flex items-start">
           <AlertTriangle className="h-3 w-3 text-red-400 mr-1 mt-0.5 flex-shrink-0" />
-          <span className="text-red-300">{uploadError}</span>
+          <span className="text-red-300">
+            {isOffline ? 'You appear to be offline. Please check your internet connection.' : uploadError}
+          </span>
         </div>
       )}
       
@@ -65,8 +71,16 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           onClick={onUpload} 
           className="w-full bg-mixify-purple hover:bg-mixify-purple-dark"
           size="sm"
+          disabled={isOffline}
         >
-          Upload Track {trackNumber}
+          {isOffline ? (
+            <span className="flex items-center">
+              <WifiOff className="h-3 w-3 mr-1" />
+              Offline Mode
+            </span>
+          ) : (
+            `Upload Track ${trackNumber}`
+          )}
         </Button>
       )}
     </div>
