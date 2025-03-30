@@ -46,8 +46,8 @@ export function useApiKeyStatus(): ApiKeyStatus {
     validateKeys();
   }, [validateKeys]);
 
-  // Calculate if any key is valid
-  const anyKeyValid = (status.claude?.valid || status.openai?.valid) === true;
+  // Calculate if any key is valid - using explicit comparison for safety
+  const anyKeyValid = (status.claude?.valid === true || status.openai?.valid === true);
 
   return {
     ...status,

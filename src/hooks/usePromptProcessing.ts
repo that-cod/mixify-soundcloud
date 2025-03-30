@@ -26,7 +26,10 @@ export const usePromptProcessing = ({
   const [promptAnalysisResult, setPromptAnalysisResult] = useState<PromptAnalysisResult | null>(null);
   
   const { toast } = useToast();
-  const { anyKeyValid } = useApiKeyStatus();
+  const { claude, openai } = useApiKeyStatus();
+  
+  // Check if at least one API key is valid
+  const anyKeyValid = (claude?.valid === true || openai?.valid === true);
 
   // Handler to process analysis results from any AI service
   const processAnalysisResult = (analysisResult: PromptAnalysisResult, source: string): boolean => {

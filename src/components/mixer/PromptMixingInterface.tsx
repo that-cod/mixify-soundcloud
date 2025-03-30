@@ -35,7 +35,10 @@ export const PromptMixingInterface: React.FC<PromptMixingInterfaceProps> = ({
 }) => {
   // Local state
   const [promptText, setPromptText] = useState('');
-  const { anyKeyValid, claude, openai, isChecking } = useApiKeyStatus();
+  const { claude, openai, isChecking } = useApiKeyStatus();
+  
+  // Calculate if any key is valid
+  const anyKeyValid = (claude?.valid === true || openai?.valid === true);
   
   // Helper to check if we can submit (both tracks analyzed and prompt not empty)
   const canSubmit = 

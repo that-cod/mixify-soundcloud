@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -94,7 +95,10 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
 }) => {
   const [mixMode, setMixMode] = useState<'manual' | 'prompt'>('manual');
   const { toast } = useToast();
-  const { anyKeyValid } = useApiKeyStatus();
+  const { claude, openai } = useApiKeyStatus();
+  
+  // Calculate if any key is valid
+  const anyKeyValid = (claude?.valid === true || openai?.valid === true);
 
   const handlePromptSubmit = (prompt: string) => {
     // Check for API key before submitting
