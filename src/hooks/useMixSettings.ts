@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { MixSettingsType } from '@/types/mixer';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { PromptAnalysisResult } from '@/services/openai-service';
 
 export const useMixSettings = () => {
   // Mix settings

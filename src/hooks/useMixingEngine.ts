@@ -1,6 +1,6 @@
 
 import { useToast } from '@/hooks/use-toast';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { PromptAnalysisResult } from '@/services/openai-service';
 import { useTrackInfo } from './useTrackInfo';
 import { useMixSettings } from './useMixSettings';
 import { usePlaybackControls } from './usePlaybackControls';

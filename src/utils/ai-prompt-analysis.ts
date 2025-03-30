@@ -1,5 +1,5 @@
 
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { PromptAnalysisResult } from '@/services/openai-service';
 
 /**
  * Get insights about instructions grouped by type

@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import { MixSettingsType } from '@/types/mixer';
 import { AudioFeatures, PrecomputedOperations } from '@/types/audio';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import { PromptAnalysisResult } from '@/services/openai-service';
 import { API } from '@/config';
 import { cachePrecomputedOps, getPrecomputedOps } from '@/services/analysis-cache';
 
