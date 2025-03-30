@@ -13,8 +13,8 @@ export const BucketStatusSection: React.FC<BucketStatusSectionProps> = ({
   bucketStatus,
   storageBucketChecking,
 }) => {
-  // When checking bucket status, show loading indicator
-  if (storageBucketChecking) {
+  // When checking bucket status, show loading indicator only in development mode
+  if (storageBucketChecking && import.meta.env.DEV) {
     return (
       <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-lg">
         <div className="flex items-center">
@@ -25,6 +25,11 @@ export const BucketStatusSection: React.FC<BucketStatusSectionProps> = ({
     );
   }
 
+  // In production, hide all bucket status messages
+  if (!import.meta.env.DEV) {
+    return null;
+  }
+  
   // Check for critical conditions: if bucket status is null or canUpload is true, don't show warnings
   if (!bucketStatus || bucketStatus.canUpload) {
     return null;

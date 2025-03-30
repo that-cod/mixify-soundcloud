@@ -8,6 +8,7 @@ import { FilePreview } from './uploader/FilePreview';
 import { AUDIO_BUCKET } from '@/services/storage-service';
 import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AudioUploaderProps {
   trackNumber: 1 | 2;
@@ -15,6 +16,8 @@ interface AudioUploaderProps {
 }
 
 export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUploadComplete }) => {
+  const { user } = useAuth();
+  
   const {
     file,
     uploading,
@@ -40,11 +43,13 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
         </Alert>
       )}
       
-      {/* Bucket check loader */}
-      <BucketCheckLoader isLoading={bucketCheckInProgress} />
+      {/* Bucket check loader - Only show to admin users or in development */}
+      {import.meta.env.DEV && (
+        <BucketCheckLoader isLoading={bucketCheckInProgress} />
+      )}
       
-      {/* Bucket status alerts */}
-      {!bucketCheckInProgress && bucketStatus && (
+      {/* Bucket status alerts - Only show to admin users or in development */}
+      {import.meta.env.DEV && !bucketCheckInProgress && bucketStatus && (
         <BucketStatusAlert 
           bucketStatus={bucketStatus}
           bucketName={AUDIO_BUCKET}
