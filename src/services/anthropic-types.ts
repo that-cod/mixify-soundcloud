@@ -39,18 +39,18 @@ export interface PromptAnalysisResultType {
 // Using export type for re-exporting types when isolatedModules is enabled
 export type { AudioFeatures };
 
-// Define AnthropicResponse
+// Define AnthropicResponse with proper content structure
 export interface AnthropicResponse {
-  id: string;
-  type: string;
-  role: string;
+  id?: string;
+  type?: string;
+  role?: string;
   content: {
     type: string;
     text: string;
   }[];
-  model: string;
-  stop_reason: string;
-  usage: {
+  model?: string;
+  stop_reason?: string;
+  usage?: {
     input_tokens: number;
     output_tokens: number;
   };

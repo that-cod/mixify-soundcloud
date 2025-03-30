@@ -1,4 +1,3 @@
-
 import { MixSettingsType } from '@/types/mixer';
 import { PromptAnalysisResult, AnthropicResponse, DEFAULT_MIX_SETTINGS } from './anthropic-types';
 
@@ -92,9 +91,6 @@ export function handleApiError(error: any): PromptAnalysisResult {
   };
 }
 
-/**
- * Extract mixing instructions from text
- */
 function extractInstructionsFromText(text: string) {
   const instructions = [];
   

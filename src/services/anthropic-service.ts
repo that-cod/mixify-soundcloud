@@ -4,9 +4,7 @@ import { MixSettingsType } from '@/types/mixer';
 import { AudioFeatures } from '@/types/audio';
 import { getSystemPrompt } from './anthropic-prompt';
 import { parseClaudeResponse, handleApiError, validateApiKey } from './anthropic-utils';
-
-// Explicitly export the imported type so it's available to other modules
-export type { PromptAnalysisResult } from './anthropic-types';
+import { PromptAnalysisResult } from './anthropic-types';
 
 /**
  * Main function to analyze prompt using Claude API
@@ -41,9 +39,21 @@ export const analyzePromptWithClaude = async (
 
     console.log("Claude API response received, ID:", response.id);
 
-    // Parse the Claude response
-    const content = response.content[0].text;
-    return parseClaudeResponse({ content: [{ text: content }] });
+    // Parse the Claude response - safely access content
+    if (response.content && response.content.length > 0) {
+      const contentBlock = response.content[0];
+      
+      // Check if the content block is a text block (not a tool use block)
+      if (contentBlock.type === 'text') {
+        return parseClaudeResponse({ 
+          content: [{ type: 'text', text: contentBlock.text }] 
+        });
+      }
+    }
+    
+    // If we couldn't parse the response properly, return a default response
+    console.error("Unexpected response format from Claude API");
+    return handleApiError(new Error("Unexpected response format"));
     
   } catch (error) {
     console.error("Claude API error:", error);
@@ -62,3 +72,6 @@ export const analyzePromptWithClaude = async (
     return handleApiError(error);
   }
 };
+
+// Re-export PromptAnalysisResult type for use in other modules
+export type { PromptAnalysisResult };
