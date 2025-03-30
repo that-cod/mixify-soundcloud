@@ -57,14 +57,19 @@ export const processPromptMix = async (
     // Try fallback to the direct AI API
     console.log("Attempting fallback to direct AI APIs...");
     try {
-      return await processWithFallbackAI(
+      const result = await processWithFallbackAI(
         prompt, 
         track1Features, 
         track2Features,
         processResults
       );
+      
+      clearInterval(progressInterval);
+      onProgress(100);
+      return result;
     } catch (fallbackError) {
       console.error("All prompt processing methods failed:", fallbackError);
+      clearInterval(progressInterval);
       onProgress(0);
       throw fallbackError; // Re-throw to allow caller to handle
     }

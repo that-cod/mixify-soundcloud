@@ -94,7 +94,9 @@ export const useMixOperations = ({
           recommendedSettings: promptAnalysis.recommendedSettings
         } : undefined,
         // Flag to indicate if we should use precomputed operations
-        usePrecomputed: !!precomputedOps
+        usePrecomputed: !!precomputedOps,
+        // Explicitly add an output file name
+        outputFileName: `mixed-track-${Date.now()}.mp3`
       };
       
       console.log("Starting mix with payload:", JSON.stringify(payload, null, 2));
@@ -114,7 +116,8 @@ export const useMixOperations = ({
             const percentCompleted = Math.round((progressEvent.loaded * 10) / progressEvent.total) + 10;
             setMixProgress(Math.min(percentCompleted, 95));
           }
-        }
+        },
+        timeout: 120000 // Increase timeout to 2 minutes
       });
       
       // Clear progress simulation
@@ -123,10 +126,12 @@ export const useMixOperations = ({
       // Handle successful response
       setMixProgress(100);
       
+      console.log("Mix response:", response.data);
+      
       if (response.data.mixedTrackPath) {
-        const fullUrl = `${window.location.origin}${response.data.mixedTrackPath}`;
+        const fullUrl = response.data.mixedTrackPath;
         console.log("Mix successful, track URL:", fullUrl);
-        setMixedTrackUrl(response.data.mixedTrackPath);
+        setMixedTrackUrl(fullUrl);
         
         toast({
           title: "Mix Complete",
@@ -168,6 +173,7 @@ export const useMixOperations = ({
       });
       
       setMixProgress(0);
+      setIsMixing(false);
       return false;
     } finally {
       setIsMixing(false);

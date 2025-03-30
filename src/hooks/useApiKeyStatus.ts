@@ -20,6 +20,7 @@ export function useApiKeyStatus(): ApiKeyStatus {
   });
 
   const validateKeys = useCallback(async () => {
+    console.log("Starting API key validation...");
     setStatus(prev => ({ ...prev, isChecking: true, error: null }));
     try {
       console.log("Checking API keys...");
@@ -46,7 +47,10 @@ export function useApiKeyStatus(): ApiKeyStatus {
   }, [validateKeys]);
 
   // Calculate if any key is valid - using explicit comparison for safety
-  const anyKeyValid = Boolean(status.claude?.valid === true || status.openai?.valid === true);
+  const anyKeyValid = Boolean(
+    (status.claude && status.claude.valid === true) || 
+    (status.openai && status.openai.valid === true)
+  );
 
   return {
     ...status,

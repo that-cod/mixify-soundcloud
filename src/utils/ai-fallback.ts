@@ -18,6 +18,11 @@ export const processWithFallbackAI = async (
   // Get API keys from localStorage
   const apiKeys = getApiKeys();
   
+  if (!apiKeys.claude && !apiKeys.openai) {
+    console.error("No API keys available for fallback");
+    throw new Error("No API keys available. Please add your Claude or OpenAI API key in settings.");
+  }
+  
   try {
     // First try with Claude if the API key is available
     if (apiKeys.claude) {
@@ -65,7 +70,7 @@ export const processWithFallbackAI = async (
         
       } catch (openaiError) {
         console.error("OpenAI API call failed:", openaiError);
-        throw new Error("All AI direct API calls failed. Please check your API keys and try again.");
+        throw new Error("OpenAI API call failed: " + (openaiError.message || "Unknown error"));
       }
     } else {
       console.log("No OpenAI key provided");
