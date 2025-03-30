@@ -1,10 +1,11 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ApiKeyInput } from './ApiKeyInput';
 
 export const ApiKeyStatus: React.FC = () => {
   const { claude, openai, isChecking, error, checkKeys } = useApiKeyStatus();
@@ -44,7 +45,7 @@ export const ApiKeyStatus: React.FC = () => {
         <div>
           <CardTitle>API Key Status</CardTitle>
           <CardDescription>
-            Check if the API keys used for AI mixing are valid and working
+            Enter your API keys to enable AI-powered mixing features
           </CardDescription>
         </div>
         <Button 
@@ -68,19 +69,21 @@ export const ApiKeyStatus: React.FC = () => {
             <div className="p-3 rounded-md bg-white/5">
               <h3 className="text-sm font-medium mb-2">Anthropic Claude API</h3>
               {renderStatus(claude, "Claude")}
+              {!claude?.valid && <ApiKeyInput provider="claude" onValidationComplete={checkKeys} />}
             </div>
             
             <div className="p-3 rounded-md bg-white/5">
               <h3 className="text-sm font-medium mb-2">OpenAI API</h3>
               {renderStatus(openai, "OpenAI")}
+              {!openai?.valid && <ApiKeyInput provider="openai" onValidationComplete={checkKeys} />}
             </div>
             
             {!anyKeyValid && (
               <Alert variant="destructive" className="mt-4">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>API Key Problem</AlertTitle>
+                <AlertTitle>API Key Required</AlertTitle>
                 <AlertDescription>
-                  No valid AI API keys found. AI-powered mixing features will not work correctly.
+                  Please enter at least one valid AI API key to use AI-powered mixing features.
                 </AlertDescription>
               </Alert>
             )}
@@ -97,7 +100,8 @@ export const ApiKeyStatus: React.FC = () => {
         )}
         
         <p className="text-xs text-white/60 mt-2">
-          Note: API keys are stored in the server's .env file and are used for AI-powered mixing features.
+          Note: Your API keys are stored locally in your browser and are never sent to our servers.
+          These keys are required for AI-powered mixing features to work.
         </p>
       </CardContent>
     </Card>

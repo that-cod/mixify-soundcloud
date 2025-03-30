@@ -15,7 +15,7 @@ export const processWithFallbackAI = async (
 ): Promise<boolean> => {
   console.log("Using fallback prompt processing method");
   
-  // Get API keys from the validator
+  // Get API keys from localStorage
   const apiKeys = getApiKeys();
   
   try {

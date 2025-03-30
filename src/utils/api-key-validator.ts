@@ -93,19 +93,30 @@ export async function validateOpenAIApiKey(apiKey: string): Promise<{valid: bool
 }
 
 /**
- * Extracts API keys from environment variables or configuration
+ * Function to get API keys from localStorage instead of hardcoding
  */
 export function getApiKeys(): { claude: string | null; openai: string | null } {
-  // Note: You should replace these with your actual API keys
-  const claudeKey = null; // Remove hardcoded API key for security
+  // Get the Claude API key from localStorage
+  const claudeKey = localStorage.getItem('claudeApiKey');
   
-  // Get the OpenAI API key
-  const openaiKey = null; // Remove hardcoded API key for security
+  // Get the OpenAI API key from localStorage
+  const openaiKey = localStorage.getItem('openaiApiKey');
   
   return {
     claude: claudeKey,
     openai: openaiKey
   };
+}
+
+/**
+ * Save an API key to localStorage
+ */
+export function saveApiKey(provider: 'claude' | 'openai', key: string): void {
+  if (provider === 'claude') {
+    localStorage.setItem('claudeApiKey', key);
+  } else {
+    localStorage.setItem('openaiApiKey', key);
+  }
 }
 
 /**
