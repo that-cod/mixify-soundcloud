@@ -47,7 +47,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
       </div>
       
       {uploadError && (
-        <div className="mb-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs flex items-start">
+        <div className="mb-3 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs flex items-start">
           <AlertTriangle className="h-3 w-3 text-red-400 mr-1 mt-0.5 flex-shrink-0" />
           <span className="text-red-300">{uploadError}</span>
         </div>

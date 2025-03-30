@@ -15,13 +15,15 @@ const MultiTrackMixerPage: React.FC = () => {
   
   return (
     <MainLayout>
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="mb-6">
+      <div className="w-full max-w-7xl mx-auto px-4 py-6">
+        <div className="mb-8">
           <h1 className="text-3xl font-bold">Advanced Mixer Studio</h1>
           <p className="text-white/70">Mix multiple tracks with advanced audio processing tools</p>
         </div>
         
-        <MultiTrackMixer />
+        <div className="overflow-hidden rounded-lg bg-black/20 border border-white/5 p-6">
+          <MultiTrackMixer />
+        </div>
       </div>
     </MainLayout>
   );

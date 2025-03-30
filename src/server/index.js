@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -100,12 +101,16 @@ function startServer() {
         size: `${(req.file.size / (1024 * 1024)).toFixed(2)} MB`
       });
       
-      // Return success response
+      // Return success response with full URL
+      const baseUrl = req.protocol + '://' + req.get('host');
+      const fileUrl = `/api/tracks/${path.basename(req.file.path)}`;
+      
       res.status(200).json({
         message: 'File uploaded successfully',
-        filePath: req.file.path,
+        filePath: fileUrl,
         fileName: req.file.originalname,
-        fileId: path.basename(req.file.path)
+        fileId: path.basename(req.file.path),
+        fullUrl: baseUrl + fileUrl
       });
     });
   });

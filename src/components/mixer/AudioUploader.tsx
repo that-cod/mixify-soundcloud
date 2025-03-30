@@ -6,6 +6,7 @@ import { BucketStatusAlert } from './uploader/BucketStatusAlert';
 import { DropZone } from './uploader/DropZone';
 import { FilePreview } from './uploader/FilePreview';
 import { AUDIO_BUCKET } from '@/services/storage-service';
+import { AlertTriangle } from 'lucide-react';
 
 interface AudioUploaderProps {
   trackNumber: 1 | 2;
@@ -26,7 +27,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
   } = useAudioUpload({ trackNumber, onUploadComplete });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full">
       {/* Bucket check loader */}
       <BucketCheckLoader isLoading={bucketCheckInProgress} />
       

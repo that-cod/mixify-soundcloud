@@ -103,9 +103,9 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
   }, [toast]);
 
   // Try Supabase upload method
-  const trySupabaseUpload = async (file: File): Promise<{success: boolean, url?: string}> => {
+  const trySupabaseUpload = async (file: File): Promise<{success: boolean, url?: string, error?: string}> => {
     if (!(bucketStatus?.exists && bucketStatus?.canUpload)) {
-      return { success: false };
+      return { success: false, error: "Supabase storage not available" };
     }
     
     try {
@@ -120,12 +120,12 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       return { success: true, url: result.publicUrl };
     } catch (error: any) {
       console.error("Supabase upload failed:", error);
-      return { success: false };
+      return { success: false, error: error.message || "Supabase upload failed" };
     }
   };
 
   // Try backend API upload method
-  const tryBackendUpload = async (file: File): Promise<{success: boolean, url?: string}> => {
+  const tryBackendUpload = async (file: File): Promise<{success: boolean, url?: string, error?: string}> => {
     try {
       console.log("Attempting backend API upload...");
       const formData = new FormData();
@@ -147,7 +147,8 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       return { success: true, url: response.data.filePath };
     } catch (error: any) {
       console.error("Backend upload failed:", error?.response?.data || error.message);
-      return { success: false };
+      const errorMsg = error?.response?.data?.error || error?.response?.data?.details || error.message || "Backend upload failed";
+      return { success: false, error: errorMsg };
     }
   };
 
@@ -163,30 +164,44 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       setProgress(5); // Start with some initial progress
       setUploadError(null);
       
-      // Try both upload methods
-      let uploadResult;
-      
       // First try backend upload (default method)
-      uploadResult = await tryBackendUpload(file);
+      const backendResult = await tryBackendUpload(file);
       
-      // If backend upload fails, try Supabase upload as fallback
-      if (!uploadResult.success) {
-        console.log("Backend upload failed, trying Supabase fallback...");
-        uploadResult = await trySupabaseUpload(file);
-      }
-      
-      // Check if any upload method succeeded
-      if (uploadResult.success && uploadResult.url) {
+      // If backend upload succeeds, use that result
+      if (backendResult.success && backendResult.url) {
         setProgress(100);
-        onUploadComplete(uploadResult.url, file.name);
+        onUploadComplete(backendResult.url, file.name);
         
         toast({
           title: "Upload complete",
           description: `Track ${trackNumber} uploaded successfully.`,
         });
-      } else {
-        throw new Error("All upload methods failed");
+        return;
       }
+      
+      // If backend upload fails, try Supabase as fallback
+      console.log("Backend upload failed, trying Supabase fallback...");
+      const supabaseResult = await trySupabaseUpload(file);
+      
+      // If Supabase upload succeeds, use that result
+      if (supabaseResult.success && supabaseResult.url) {
+        setProgress(100);
+        onUploadComplete(supabaseResult.url, file.name);
+        
+        toast({
+          title: "Upload complete",
+          description: `Track ${trackNumber} uploaded successfully (via storage fallback).`,
+        });
+        return;
+      }
+      
+      // If both methods fail, throw an error with details
+      const errorDetails = [
+        backendResult.error && `Backend: ${backendResult.error}`,
+        supabaseResult.error && `Storage: ${supabaseResult.error}`
+      ].filter(Boolean).join('. ');
+      
+      throw new Error(`All upload methods failed. ${errorDetails}`);
       
     } catch (error: any) {
       console.error(`Upload failed:`, error);
@@ -196,7 +211,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       
       toast({
         title: "Upload failed",
-        description: "Could not upload file. Check console for details.",
+        description: "Could not upload file. Please try again.",
         variant: "destructive",
       });
     } finally {
