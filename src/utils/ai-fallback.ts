@@ -1,6 +1,6 @@
 
-import axios from 'axios';
-import { PromptAnalysisResult } from '@/services/anthropic-service';
+import Anthropic from '@anthropic-ai/sdk';
+import { PromptAnalysisResult } from '@/services/anthropic-types';
 import { AudioFeatures } from '@/types/audio';
 import { getApiKeys } from './api-key-validator';
 
