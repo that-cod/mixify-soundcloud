@@ -22,6 +22,7 @@ export const analyzePromptWithClaude = async (
     // Create Anthropic client
     const anthropic = new Anthropic({
       apiKey: validatedApiKey,
+      dangerouslyAllowBrowser: true,
     });
     
     const systemPrompt = getSystemPrompt(track1Features, track2Features);

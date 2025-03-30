@@ -11,6 +11,7 @@ export async function validateClaudeApiKey(apiKey: string): Promise<{valid: bool
     // Create Anthropic client with the API key
     const anthropic = new Anthropic({
       apiKey: apiKey,
+      dangerouslyAllowBrowser: true,
     });
     
     // Make a test request to validate the key
