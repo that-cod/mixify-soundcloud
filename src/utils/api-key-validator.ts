@@ -97,7 +97,7 @@ export async function validateOpenAIApiKey(apiKey: string): Promise<{valid: bool
  */
 export function getApiKeys(): { claude: string | null; openai: string | null } {
   // Get the Claude API key - updated to use the new key
-  const claudeKey = "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";
+  const claudeKey = "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";
   
   // Get the OpenAI API key
   const openaiKey = "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";
