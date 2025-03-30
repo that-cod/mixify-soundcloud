@@ -7,6 +7,7 @@ import { StageProgress } from './staged/StageProgress';
 import { StageParameters } from './staged/StageParameters';
 import { StageControls } from './staged/StageControls';
 import { StagePreview } from './staged/StagePreview';
+import { PlaybackControls } from './PlaybackControls';
 import { formatParamLabel } from './staged/utils';
 
 interface StagedMixingProcessProps {
@@ -31,6 +32,8 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
   const [stagePreviewUrl, setStagePreviewUrl] = useState<string | undefined>();
   const [settings, setSettings] = useState<StagedMixSettings>(initialSettings);
   const [overallProgress, setOverallProgress] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(0.8);
   
   // Get current stage info
   const currentStageInfo = MIXING_STAGES.find(stage => stage.id === currentStage) || MIXING_STAGES[0];
@@ -75,6 +78,18 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
     setStageProgress(0);
     // Reset preview for this stage
     setStagePreviewUrl(undefined);
+    // Stop playback if playing
+    setIsPlaying(false);
+  };
+  
+  // Playback controls handlers
+  const togglePlayback = () => {
+    setIsPlaying(!isPlaying);
+  };
+  
+  const restartPlayback = () => {
+    // Implementation would restart audio playback
+    console.log('Restarting playback');
   };
   
   // Simulate stage progress (in a real implementation, this would be real-time feedback from the mixing process)
@@ -117,13 +132,19 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
       }
     }, 200);
   };
+
+  // Show playback controls when in complete stage or when final mix is complete
+  const showPlaybackControls = currentStage === 'complete' || 
+    (currentStage === 'finalMix' && stageStatus === 'complete');
   
   return (
     <Card className="glass-card">
       <CardHeader>
         <CardTitle>Multi-Stage Mixing Process</CardTitle>
         <CardDescription>
-          {currentStageInfo?.description || 'Processing tracks'}
+          {currentStage === 'complete' 
+            ? 'Mix completed successfully' 
+            : currentStageInfo?.description || 'Processing tracks'}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -137,6 +158,21 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
         
         {/* Stage preview */}
         <StagePreview previewUrl={stagePreviewUrl} />
+        
+        {/* Playback controls for completed mix */}
+        {showPlaybackControls && stagePreviewUrl && (
+          <div className="my-4">
+            <PlaybackControls
+              isPlaying={isPlaying}
+              togglePlayback={togglePlayback}
+              volume={volume}
+              setVolume={setVolume}
+              restart={restartPlayback}
+              downloadUrl={stagePreviewUrl}
+              trackName="mixify-mixed-track.mp3"
+            />
+          </div>
+        )}
         
         {/* Controls */}
         <StageControls
