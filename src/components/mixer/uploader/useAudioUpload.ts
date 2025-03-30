@@ -5,7 +5,8 @@ import axios from 'axios';
 import { 
   AUDIO_BUCKET, 
   checkBucketStatus,
-  type BucketStatus
+  type BucketStatus,
+  uploadAudioFile
 } from '@/services/storage-service';
 import { API, AUDIO_SETTINGS } from '@/config';
 
@@ -20,6 +21,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
   const [progress, setProgress] = useState(0);
   const [bucketStatus, setBucketStatus] = useState<BucketStatus | null>(null);
   const [bucketCheckInProgress, setBucketCheckInProgress] = useState(true);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Check storage bucket status when component mounts
@@ -30,6 +32,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
         setBucketCheckInProgress(true);
         
         const status = await checkBucketStatus();
+        console.log(`Bucket status check result:`, status);
         setBucketStatus(status);
         
         if (!status.exists) {
@@ -65,6 +68,9 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
       return;
     }
     
+    // Clear any previous upload errors
+    setUploadError(null);
+    
     // Validate file type
     if (!AUDIO_SETTINGS.supportedFormats.includes(selectedFile.type)) {
       console.warn(`Invalid file type:`, selectedFile.type);
@@ -96,18 +102,32 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
     setFile(selectedFile);
   }, [toast]);
 
-  // Handle file upload
-  const uploadFile = async () => {
-    if (!file) {
-      console.warn(`Cannot upload - no file selected`);
-      return;
+  // Try Supabase upload method
+  const trySupabaseUpload = async (file: File): Promise<{success: boolean, url?: string}> => {
+    if (!(bucketStatus?.exists && bucketStatus?.canUpload)) {
+      return { success: false };
     }
-
+    
     try {
-      setUploading(true);
-      setProgress(5); // Start with some initial progress
+      console.log("Attempting Supabase storage upload...");
+      const result = await uploadAudioFile(
+        file, 
+        trackNumber,
+        (progress) => setProgress(progress)
+      );
       
-      // Backend upload using API
+      console.log(`Supabase upload completed:`, result);
+      return { success: true, url: result.publicUrl };
+    } catch (error: any) {
+      console.error("Supabase upload failed:", error);
+      return { success: false };
+    }
+  };
+
+  // Try backend API upload method
+  const tryBackendUpload = async (file: File): Promise<{success: boolean, url?: string}> => {
+    try {
+      console.log("Attempting backend API upload...");
       const formData = new FormData();
       formData.append('track', file);
       
@@ -123,64 +143,62 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
         }
       });
       
-      console.log(`Upload completed:`, response.data);
-      setProgress(100);
+      console.log(`Backend upload completed:`, response.data);
+      return { success: true, url: response.data.filePath };
+    } catch (error: any) {
+      console.error("Backend upload failed:", error?.response?.data || error.message);
+      return { success: false };
+    }
+  };
+
+  // Handle file upload
+  const uploadFile = async () => {
+    if (!file) {
+      console.warn(`Cannot upload - no file selected`);
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setProgress(5); // Start with some initial progress
+      setUploadError(null);
       
-      // Construct file URL for frontend use
-      const fileUrl = response.data.filePath;
+      // Try both upload methods
+      let uploadResult;
       
-      // Notify parent component
-      onUploadComplete(fileUrl, file.name);
+      // First try backend upload (default method)
+      uploadResult = await tryBackendUpload(file);
+      
+      // If backend upload fails, try Supabase upload as fallback
+      if (!uploadResult.success) {
+        console.log("Backend upload failed, trying Supabase fallback...");
+        uploadResult = await trySupabaseUpload(file);
+      }
+      
+      // Check if any upload method succeeded
+      if (uploadResult.success && uploadResult.url) {
+        setProgress(100);
+        onUploadComplete(uploadResult.url, file.name);
+        
+        toast({
+          title: "Upload complete",
+          description: `Track ${trackNumber} uploaded successfully.`,
+        });
+      } else {
+        throw new Error("All upload methods failed");
+      }
+      
+    } catch (error: any) {
+      console.error(`Upload failed:`, error);
+      
+      const errorMessage = error.message || "Upload failed. Please try again.";
+      setUploadError(errorMessage);
       
       toast({
-        title: "Upload complete",
-        description: `Track ${trackNumber} uploaded successfully.`,
+        title: "Upload failed",
+        description: "Could not upload file. Check console for details.",
+        variant: "destructive",
       });
-    } catch (error: any) {
-      console.error(`Error uploading file:`, error);
-      
-      // Try fallback to Supabase if backend upload fails
-      if (bucketStatus?.exists && bucketStatus?.canUpload) {
-        // Import the upload function dynamically to avoid circular dependencies
-        const { uploadAudioFile } = await import('@/services/storage-service');
-        
-        try {
-          toast({
-            title: "Trying fallback upload",
-            description: "Backend upload failed. Trying alternative upload method...",
-          });
-          
-          const result = await uploadAudioFile(
-            file, 
-            trackNumber,
-            (progress) => setProgress(progress)
-          );
-          
-          console.log(`Fallback upload completed:`, result);
-          
-          // Notify parent component
-          onUploadComplete(result.publicUrl, file.name);
-          
-          toast({
-            title: "Upload complete (fallback)",
-            description: `Track ${trackNumber} uploaded successfully.`,
-          });
-        } catch (fallbackError: any) {
-          console.error(`Fallback upload failed:`, fallbackError);
-          
-          toast({
-            title: "Upload failed",
-            description: "Both upload methods failed. Please try again later.",
-            variant: "destructive",
-          });
-        }
-      } else {
-        toast({
-          title: "Upload failed",
-          description: error.response?.data?.error || "Failed to upload file. Please try again.",
-          variant: "destructive",
-        });
-      }
     } finally {
       setUploading(false);
       
@@ -191,6 +209,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
 
   const removeFile = () => {
     setFile(null);
+    setUploadError(null);
   };
 
   return {
@@ -199,6 +218,7 @@ export const useAudioUpload = ({ trackNumber, onUploadComplete }: UseAudioUpload
     progress,
     bucketStatus,
     bucketCheckInProgress,
+    uploadError,
     onDrop,
     uploadFile,
     removeFile,

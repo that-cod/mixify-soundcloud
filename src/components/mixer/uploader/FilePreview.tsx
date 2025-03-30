@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Music2, X } from 'lucide-react';
+import { Music2, X, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
@@ -11,6 +11,7 @@ interface FilePreviewProps {
   onRemove: () => void;
   onUpload: () => void;
   trackNumber: number;
+  uploadError?: string | null;
 }
 
 export const FilePreview: React.FC<FilePreviewProps> = ({
@@ -20,6 +21,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   onRemove,
   onUpload,
   trackNumber,
+  uploadError,
 }) => {
   return (
     <div className="rounded-lg border border-white/20 p-4 bg-white/5">
@@ -43,6 +45,13 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           <X className="h-4 w-4" />
         </Button>
       </div>
+      
+      {uploadError && (
+        <div className="mb-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs flex items-start">
+          <AlertTriangle className="h-3 w-3 text-red-400 mr-1 mt-0.5 flex-shrink-0" />
+          <span className="text-red-300">{uploadError}</span>
+        </div>
+      )}
       
       {uploading ? (
         <div className="space-y-2">

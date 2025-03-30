@@ -19,6 +19,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
     progress,
     bucketStatus,
     bucketCheckInProgress,
+    uploadError,
     onDrop,
     uploadFile,
     removeFile,
@@ -53,6 +54,7 @@ export const AudioUploader: React.FC<AudioUploaderProps> = ({ trackNumber, onUpl
           onRemove={removeFile}
           onUpload={uploadFile}
           trackNumber={trackNumber}
+          uploadError={uploadError}
         />
       )}
     </div>

@@ -34,6 +34,12 @@ function startServer() {
   
   app.use(express.json());
 
+  // Ensure upload directory exists
+  if (!fs.existsSync(config.fileStorage.uploadDir)) {
+    console.log(`Creating upload directory: ${config.fileStorage.uploadDir}`);
+    fs.mkdirSync(config.fileStorage.uploadDir, { recursive: true });
+  }
+
   // Configure multer for file uploads
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -60,22 +66,48 @@ function startServer() {
 
   // Routes
   // Upload tracks endpoint
-  app.post('/api/upload', upload.single('track'), (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No audio file uploaded' });
+  app.post('/api/upload', (req, res) => {
+    console.log('Received upload request');
+    
+    // Use single file upload middleware with error handling
+    upload.single('track')(req, res, (err) => {
+      if (err) {
+        console.error('Upload middleware error:', err);
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ 
+            error: 'File too large',
+            details: `Maximum file size is ${config.fileStorage.maxFileSizeMB}MB`
+          });
+        }
+        return res.status(400).json({ 
+          error: err.message || 'Upload failed',
+          details: 'Check file type and size'
+        });
       }
       
+      // Check if file was uploaded
+      if (!req.file) {
+        console.error('No file in request');
+        return res.status(400).json({ 
+          error: 'No audio file uploaded',
+          details: 'Make sure to include a file with key "track"'
+        });
+      }
+      
+      console.log('File uploaded successfully:', {
+        path: req.file.path,
+        filename: req.file.originalname,
+        size: `${(req.file.size / (1024 * 1024)).toFixed(2)} MB`
+      });
+      
+      // Return success response
       res.status(200).json({
         message: 'File uploaded successfully',
         filePath: req.file.path,
         fileName: req.file.originalname,
         fileId: path.basename(req.file.path)
       });
-    } catch (error) {
-      console.error('Upload error:', error);
-      res.status(500).json({ error: 'File upload failed', details: error.message });
-    }
+    });
   });
 
   // Analyze track endpoint
@@ -182,12 +214,18 @@ function startServer() {
     });
   });
 
-  // Handle errors
+  // Error handler middleware - add detailed error responses
   app.use((err, req, res, next) => {
-    console.error('Server error:', err.stack);
-    res.status(500).json({
-      error: 'Something went wrong!',
-      details: config.server.env === 'development' ? err.message : 'Internal server error'
+    console.error('Server error:', err);
+    
+    // Return appropriate status code based on error type
+    const statusCode = err.statusCode || 500;
+    
+    // Format error message for client
+    res.status(statusCode).json({
+      error: 'Request failed',
+      message: err.message || 'Something went wrong!',
+      details: config.server.env === 'development' ? err.stack : 'Internal server error'
     });
   });
 
