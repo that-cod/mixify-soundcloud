@@ -181,6 +181,9 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
   // Show playback controls when in complete stage or when final mix is complete
   const showPlaybackControls = currentStage === 'complete' || 
     (currentStage === 'finalMix' && stageStatus === 'complete');
+
+  // Determine if we should show inline controls in StagePreview
+  const showPreviewControls = currentStage === 'finalMix' && stageStatus === 'complete';
   
   return (
     <Card className="glass-card">
@@ -202,7 +205,10 @@ export const StagedMixingProcess: React.FC<StagedMixingProcessProps> = ({
         />
         
         {/* Stage preview */}
-        <StagePreview previewUrl={stagePreviewUrl} />
+        <StagePreview 
+          previewUrl={stagePreviewUrl} 
+          showControls={showPreviewControls}
+        />
         
         {/* Hidden audio element for playback */}
         <audio ref={audioRef} src={stagePreviewUrl} style={{ display: 'none' }} />
