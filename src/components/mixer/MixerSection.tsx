@@ -12,6 +12,8 @@ import WaveSurfer from 'wavesurfer.js';
 import { useToast } from '@/hooks/use-toast';
 import { PromptAnalysisResult } from '@/services/anthropic-service';
 import { AudioFeatures } from '@/types/audio';
+import { ApiKeyStatus } from './ApiKeyStatus';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 
 interface MixerSectionProps {
   track1Url: string | undefined;
@@ -92,9 +94,20 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
 }) => {
   const [mixMode, setMixMode] = useState<'manual' | 'prompt'>('manual');
   const { toast } = useToast();
+  const { anyKeyValid } = useApiKeyStatus();
 
   const handlePromptSubmit = (prompt: string) => {
-    // Directly process the prompt without API key check
+    // Check for API key before submitting
+    if (!anyKeyValid) {
+      toast({
+        title: "API Key Issue",
+        description: "No valid AI API keys found. Please check API key status.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Process the prompt
     handlePromptMix(prompt);
   };
 
@@ -171,6 +184,9 @@ export const MixerSection: React.FC<MixerSectionProps> = ({
   
   return (
     <div className="space-y-6">
+      {/* Display API key status */}
+      <ApiKeyStatus />
+
       {(track1Url || track2Url) && (
         <div className="flex flex-col space-y-4 mb-2">
           <div className="flex items-center justify-center space-x-4">

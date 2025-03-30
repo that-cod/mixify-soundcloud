@@ -4,6 +4,7 @@
  */
 export async function validateClaudeApiKey(apiKey: string): Promise<{valid: boolean; message: string}> {
   try {
+    console.log("Validating Claude API key...");
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: 'POST',
       headers: {
@@ -23,12 +24,12 @@ export async function validateClaudeApiKey(apiKey: string): Promise<{valid: bool
       })
     });
     
+    const responseText = await response.text();
+    console.log("Claude API validation response:", response.status, responseText);
+    
     if (response.ok) {
       return { valid: true, message: "API key is valid and working." };
     } else {
-      const errorData = await response.text();
-      console.error("Claude API validation error:", errorData);
-      
       if (response.status === 401) {
         return { valid: false, message: "Invalid API key. Authentication failed." };
       } else if (response.status === 429) {
@@ -48,6 +49,7 @@ export async function validateClaudeApiKey(apiKey: string): Promise<{valid: bool
  */
 export async function validateOpenAIApiKey(apiKey: string): Promise<{valid: boolean; message: string}> {
   try {
+    console.log("Validating OpenAI API key...");
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: 'POST',
       headers: {
@@ -66,12 +68,12 @@ export async function validateOpenAIApiKey(apiKey: string): Promise<{valid: bool
       })
     });
     
+    const responseText = await response.text();
+    console.log("OpenAI API validation response:", response.status, responseText);
+    
     if (response.ok) {
       return { valid: true, message: "OpenAI API key is valid and working." };
     } else {
-      const errorData = await response.text();
-      console.error("OpenAI API validation error:", errorData);
-      
       if (response.status === 401) {
         return { valid: false, message: "Invalid OpenAI API key. Authentication failed." };
       } else if (response.status === 429) {
@@ -110,6 +112,9 @@ export async function checkApiKeys(): Promise<{
   openai: { valid: boolean; message: string };
 }> {
   const keys = getApiKeys();
+  
+  console.log("Checking Claude API key:", keys.claude ? "provided" : "not provided");
+  console.log("Checking OpenAI API key:", keys.openai ? "provided" : "not provided");
   
   const claudeResult = keys.claude 
     ? await validateClaudeApiKey(keys.claude)

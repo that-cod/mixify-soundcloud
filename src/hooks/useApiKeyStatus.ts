@@ -8,10 +8,11 @@ interface ApiKeyStatus {
   isChecking: boolean;
   error: string | null;
   checkKeys: () => Promise<void>;
+  anyKeyValid: boolean;
 }
 
 export function useApiKeyStatus(): ApiKeyStatus {
-  const [status, setStatus] = useState<Omit<ApiKeyStatus, 'checkKeys'>>({
+  const [status, setStatus] = useState<Omit<ApiKeyStatus, 'checkKeys' | 'anyKeyValid'>>({
     claude: null,
     openai: null,
     isChecking: true,
@@ -45,8 +46,12 @@ export function useApiKeyStatus(): ApiKeyStatus {
     validateKeys();
   }, [validateKeys]);
 
+  // Calculate if any key is valid
+  const anyKeyValid = (status.claude?.valid || status.openai?.valid) === true;
+
   return {
     ...status,
-    checkKeys: validateKeys
+    checkKeys: validateKeys,
+    anyKeyValid
   };
 }

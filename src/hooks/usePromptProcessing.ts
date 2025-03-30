@@ -5,6 +5,7 @@ import { PromptAnalysisResult } from '@/services/anthropic-service';
 import { AudioFeatures } from '@/types/audio';
 import { processPromptMix } from '@/utils/prompt-processor';
 import { getInstructionInsights } from '@/utils/ai-prompt-analysis';
+import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
 
 interface UsePromptProcessingProps {
   track1Features: AudioFeatures | null;
@@ -25,6 +26,7 @@ export const usePromptProcessing = ({
   const [promptAnalysisResult, setPromptAnalysisResult] = useState<PromptAnalysisResult | null>(null);
   
   const { toast } = useToast();
+  const { anyKeyValid } = useApiKeyStatus();
 
   // Handler to process analysis results from any AI service
   const processAnalysisResult = (analysisResult: PromptAnalysisResult, source: string): boolean => {
@@ -56,6 +58,15 @@ export const usePromptProcessing = ({
       toast({
         title: "Incomplete analysis",
         description: "Please wait for track analysis to complete.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    if (!anyKeyValid) {
+      toast({
+        title: "API Key Issue",
+        description: "No valid AI API keys found. Please check API key status.",
         variant: "destructive",
       });
       return false;
@@ -94,6 +105,7 @@ export const usePromptProcessing = ({
     promptProcessProgress,
     promptAnalysisResult,
     handlePromptMix,
-    getInstructionInsights: () => getInstructionInsights(promptAnalysisResult)
+    getInstructionInsights: () => getInstructionInsights(promptAnalysisResult),
+    hasValidApiKey: anyKeyValid
   };
 };

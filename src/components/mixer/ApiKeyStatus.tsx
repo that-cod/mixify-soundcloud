@@ -1,10 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
-import { checkApiKeys } from '@/utils/api-key-validator';
 import { Button } from '@/components/ui/button';
 import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export const ApiKeyStatus: React.FC = () => {
   const { claude, openai, isChecking, error, checkKeys } = useApiKeyStatus();
@@ -35,6 +35,8 @@ export const ApiKeyStatus: React.FC = () => {
       );
     }
   };
+  
+  const anyKeyValid = (claude?.valid || openai?.valid) === true;
   
   return (
     <Card className="glass-card mt-4">
@@ -72,6 +74,16 @@ export const ApiKeyStatus: React.FC = () => {
               <h3 className="text-sm font-medium mb-2">OpenAI API</h3>
               {renderStatus(openai, "OpenAI")}
             </div>
+            
+            {!anyKeyValid && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>API Key Problem</AlertTitle>
+                <AlertDescription>
+                  No valid AI API keys found. AI-powered mixing features will not work correctly.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         )}
         
