@@ -32,6 +32,7 @@ export interface PromptAnalysisResult {
   instructions: MixingInstruction[];
   summary: string;
   recommendedSettings: MixSettingsType;
+  source?: string;
 }
 
 /**
@@ -127,6 +128,9 @@ export const analyzePromptWithOpenAI = async (
       if (!parsedResult.summary) {
         parsedResult.summary = "AI-generated mix based on your instructions (processed by OpenAI).";
       }
+      
+      // Mark the source
+      parsedResult.source = "openai";
       
       return parsedResult;
     } catch (parseError) {

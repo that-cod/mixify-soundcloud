@@ -1,4 +1,5 @@
-const { Configuration, OpenAIApi } = require("openai");
+
+const { OpenAI } = require("openai");
 const config = require('./config');
 const fs = require('fs');
 const path = require('path');
@@ -73,9 +74,9 @@ async function analyzeWithOpenAI(prompt, track1Features, track2Features) {
     throw new Error('OpenAI API key not configured');
   }
   
-  const openai = new OpenAIApi(new Configuration({
+  const openai = new OpenAI({
     apiKey: OPENAI_API_KEY
-  }));
+  });
   
   // Create system prompt with track features
   const systemPrompt = `You are an AI audio mixing assistant that specializes in analyzing user instructions for mixing two musical tracks.
@@ -114,9 +115,9 @@ You should respond ONLY with a JSON object that has the following structure:
 Understand music terminology and extract both explicit and implicit instructions from the user's prompt. For instance, if they ask for a "smooth transition," that implies a longer crossfadeLength.`;
 
   try {
-    // Make the OpenAI API call
-    const response = await openai.createChatCompletion({
-      model: "gpt-4-turbo",
+    // Make the OpenAI API call using the latest API version
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // Using the newer model
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
@@ -126,7 +127,7 @@ Understand music terminology and extract both explicit and implicit instructions
     });
     
     // Extract the response content
-    const content = response.data.choices[0].message.content;
+    const content = response.choices[0].message.content;
     
     // Parse JSON from the response
     try {

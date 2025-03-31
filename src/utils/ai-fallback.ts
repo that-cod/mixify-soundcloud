@@ -1,7 +1,8 @@
 
-import { PromptAnalysisResult } from '@/services/openai-service';
+import { PromptAnalysisResult, analyzePromptWithOpenAI } from '@/services/openai-service';
 import { AudioFeatures } from '@/types/audio';
 import { getApiKeys } from './api-key-validator';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * Process with OpenAI API if backend is not available
@@ -26,9 +27,6 @@ export const processWithOpenAI = async (
     // Use OpenAI
     console.log("Using OpenAI API...");
     try {
-      // Import the OpenAI processor
-      const { analyzePromptWithOpenAI } = await import('@/services/openai-service');
-      
       // Process with OpenAI
       const openaiResult = await analyzePromptWithOpenAI(
         prompt,
@@ -43,7 +41,23 @@ export const processWithOpenAI = async (
       
     } catch (openaiError) {
       console.error("OpenAI API call failed:", openaiError);
-      throw new Error("OpenAI API call failed: " + (openaiError instanceof Error ? openaiError.message : "Unknown error"));
+      
+      // Create a more detailed error message
+      const errorMessage = openaiError instanceof Error 
+        ? openaiError.message 
+        : "Unknown error occurred";
+        
+      // Add more specific error details if available
+      let specificError = "API call failed";
+      if (errorMessage.includes("401")) {
+        specificError = "Invalid API key";
+      } else if (errorMessage.includes("429")) {
+        specificError = "Rate limit exceeded";
+      } else if (errorMessage.includes("insufficient_quota")) {
+        specificError = "Insufficient quota";
+      }
+      
+      throw new Error(`OpenAI API call failed: ${specificError}. ${errorMessage}`);
     }
   } catch (error) {
     console.error("OpenAI fallback method failed:", error);

@@ -6,6 +6,7 @@ import { AudioFeatures } from '@/types/audio';
 import { processPromptMix } from '@/utils/prompt-processor';
 import { getInstructionInsights } from '@/utils/ai-prompt-analysis';
 import { useApiKeyStatus } from '@/hooks/useApiKeyStatus';
+import { useOpenAIProcessor } from '@/hooks/useOpenAIProcessor';
 
 interface UsePromptProcessingProps {
   track1Features: AudioFeatures | null;
@@ -28,6 +29,7 @@ export const usePromptProcessing = ({
   
   const { toast } = useToast();
   const { anyKeyValid } = useApiKeyStatus();
+  const { handleApiError } = useOpenAIProcessor();
   
   // Handler to process analysis results from any AI service
   const processAnalysisResult = (analysisResult: PromptAnalysisResult, source: string): boolean => {
@@ -50,9 +52,13 @@ export const usePromptProcessing = ({
       }
       
       // Display the results to the user
+      const sourceLabel = source === "Server" 
+        ? "Analysis Complete" 
+        : `Analysis Complete (${source})`;
+        
       toast({
-        title: source === "Server" ? "Analysis Complete" : `Analysis Complete (OpenAI)`,
-        description: analysisResult.summary || `AI has determined the optimal mix settings based on your prompt! ${source !== "Server" ? `(processed by OpenAI)` : ""}`,
+        title: sourceLabel,
+        description: analysisResult.summary || `AI has determined the optimal mix settings based on your prompt!`,
       });
       
       setIsProcessingPrompt(false);
@@ -113,6 +119,7 @@ export const usePromptProcessing = ({
     } catch (error) {
       console.error("Prompt processing error:", error);
       
+      // Use the API error handler for better error messages
       const errorMessage = error instanceof Error 
         ? error.message 
         : "Failed to process your instructions. Please try again.";

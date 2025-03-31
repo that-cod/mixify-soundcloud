@@ -21,7 +21,7 @@ PORT=5000
 NODE_ENV=development
 
 # API Keys (replace with your own)
-OPENAI_API_KEY="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"
+OPENAI_API_KEY=""
 
 # File storage configuration
 MAX_FILE_SIZE_MB=25
@@ -53,7 +53,7 @@ const config = {
   },
   
   ai: {
-    openai: process.env.OPENAI_API_KEY || "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",
+    openaiApiKey: process.env.OPENAI_API_KEY || "",
   },
   
   fileStorage: {
