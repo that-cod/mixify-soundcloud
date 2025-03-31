@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { checkApiKeys } from '@/utils/api-key-validator';
+import { checkApiKeys, getApiKeys } from '@/utils/api-key-validator';
 
 interface ApiKeyStatus {
   openai: { valid: boolean; message: string } | null;
@@ -21,6 +21,17 @@ export function useApiKeyStatus(): ApiKeyStatus {
     console.log("Starting API key validation...");
     setStatus(prev => ({ ...prev, isChecking: true, error: null }));
     try {
+      // First check if keys exist
+      const keys = getApiKeys();
+      if (!keys.openai) {
+        setStatus({
+          openai: { valid: false, message: 'No OpenAI API key provided' },
+          isChecking: false,
+          error: null
+        });
+        return;
+      }
+
       console.log("Checking API keys...");
       const result = await checkApiKeys();
       console.log("API key check result:", result);

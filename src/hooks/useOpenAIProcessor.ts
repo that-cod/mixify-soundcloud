@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PromptAnalysisResult } from '@/services/openai-service';
+import { getApiKeys } from '@/utils/api-key-validator';
 
 /**
  * Hook for managing OpenAI API key validation and status
@@ -12,11 +13,27 @@ export const useOpenAIProcessor = () => {
   const { toast } = useToast();
 
   /**
+   * Get the OpenAI API key from localStorage
+   */
+  const getOpenAIApiKey = (): string => {
+    const apiKeys = getApiKeys();
+    return apiKeys.openai || '';
+  };
+
+  /**
    * Validate an OpenAI API key format
    */
   const validateApiKeyFormat = (key: string): boolean => {
     // Basic validation for OpenAI API key format
     return /^sk-[a-zA-Z0-9]{48,}$/.test(key.trim());
+  };
+
+  /**
+   * Check if there's a valid OpenAI API key available
+   */
+  const hasValidApiKey = (): boolean => {
+    const apiKey = getOpenAIApiKey();
+    return validateApiKeyFormat(apiKey);
   };
 
   /**
@@ -57,6 +74,8 @@ export const useOpenAIProcessor = () => {
     error,
     setError,
     validateApiKeyFormat,
+    hasValidApiKey,
+    getOpenAIApiKey,
     handleApiError
   };
 };

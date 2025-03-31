@@ -18,9 +18,15 @@ export const processWithOpenAI = async (
   // Get API keys from localStorage
   const apiKeys = getApiKeys();
   
-  if (!apiKeys.openai) {
+  if (!apiKeys.openai || !apiKeys.openai.trim()) {
     console.error("No OpenAI API key available");
     throw new Error("No OpenAI API key available. Please add your OpenAI API key in settings.");
+  }
+  
+  // Check API key format
+  if (!apiKeys.openai.startsWith('sk-')) {
+    console.error("Invalid OpenAI API key format");
+    throw new Error("Invalid OpenAI API key format. API keys should start with 'sk-'.");
   }
   
   try {
@@ -39,7 +45,7 @@ export const processWithOpenAI = async (
       console.log("OpenAI API call succeeded");
       return processAnalysisCallback(openaiResult, "OpenAI");
       
-    } catch (openaiError) {
+    } catch (openaiError: any) {
       console.error("OpenAI API call failed:", openaiError);
       
       // Create a more detailed error message

@@ -28,8 +28,8 @@ export const usePromptProcessing = ({
   const [promptProcessError, setPromptProcessError] = useState<string | null>(null);
   
   const { toast } = useToast();
-  const { anyKeyValid } = useApiKeyStatus();
-  const { handleApiError } = useOpenAIProcessor();
+  const { openai } = useApiKeyStatus();
+  const { handleApiError, hasValidApiKey, getOpenAIApiKey } = useOpenAIProcessor();
   
   // Handler to process analysis results from any AI service
   const processAnalysisResult = (analysisResult: PromptAnalysisResult, source: string): boolean => {
@@ -84,10 +84,21 @@ export const usePromptProcessing = ({
       return false;
     }
     
-    if (!anyKeyValid) {
+    // Double-check API key validity before proceeding
+    if (!hasValidApiKey()) {
       toast({
         title: "API Key Issue",
-        description: "No valid OpenAI API key found. Please check API key status.",
+        description: "No valid OpenAI API key found. Please check your API key in settings.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    // Ensure the openai key from useApiKeyStatus is marked as valid
+    if (!openai?.valid) {
+      toast({
+        title: "API Key Not Validated",
+        description: "Your API key hasn't been validated. Please check API key status.",
         variant: "destructive",
       });
       return false;
@@ -103,6 +114,7 @@ export const usePromptProcessing = ({
     });
 
     try {
+      // Pass the API key directly to ensure it's available
       const success = await processPromptMix(
         prompt,
         track1Features,
@@ -120,18 +132,9 @@ export const usePromptProcessing = ({
       console.error("Prompt processing error:", error);
       
       // Use the API error handler for better error messages
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Failed to process your instructions. Please try again.";
+      const errorMessage = handleApiError(error);
       
       setPromptProcessError(errorMessage);
-      
-      toast({
-        title: "Prompt Processing Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      
       setIsProcessingPrompt(false);
       setPromptProcessProgress(0);
       return false;
@@ -145,6 +148,6 @@ export const usePromptProcessing = ({
     promptProcessError,
     handlePromptMix,
     getInstructionInsights: () => getInstructionInsights(promptAnalysisResult),
-    hasValidApiKey: anyKeyValid
+    hasValidApiKey: hasValidApiKey() && openai?.valid === true
   };
 };

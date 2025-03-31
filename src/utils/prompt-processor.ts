@@ -4,6 +4,7 @@ import axios from 'axios';
 import { AudioFeatures } from '@/types/audio';
 import { PromptAnalysisResult } from '@/services/openai-service';
 import { processWithOpenAI } from './ai-fallback';
+import { getApiKeys } from './api-key-validator';
 
 /**
  * Process a mixing prompt with backend or fallback to direct OpenAI API
@@ -26,13 +27,21 @@ export const processPromptMix = async (
     }
   }, 300);
   
+  // Double-check API key validity before proceeding
+  const apiKeys = getApiKeys();
+  if (!apiKeys.openai || !apiKeys.openai.trim()) {
+    clearInterval(progressInterval);
+    throw new Error("No valid OpenAI API key found. Please check API key status.");
+  }
+  
   try {
     // Process the prompt using the backend API
     console.log("Attempting backend prompt processing...");
     const response = await axios.post(API.endpoints.processPrompt, {
       prompt,
       track1Features,
-      track2Features
+      track2Features,
+      apiKey: apiKeys.openai // Pass the key to the backend
     });
     
     clearInterval(progressInterval);
