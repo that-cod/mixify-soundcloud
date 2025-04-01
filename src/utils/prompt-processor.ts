@@ -37,12 +37,20 @@ export const processPromptMix = async (
   try {
     // Process the prompt using the backend API
     console.log("Attempting backend prompt processing...");
-    const response = await axios.post(API.endpoints.processPrompt, {
+    console.log("Using API endpoint:", API.endpoints.processPrompt);
+    
+    const payload = {
       prompt,
       track1Features,
       track2Features,
       apiKey: apiKeys.openai // Pass the key to the backend
-    });
+    };
+    console.log("Sending prompt request with payload:", JSON.stringify({
+      ...payload,
+      apiKey: '***REDACTED***' // Redact API key for logging
+    }));
+    
+    const response = await axios.post(API.endpoints.processPrompt, payload);
     
     clearInterval(progressInterval);
     onProgress(100);

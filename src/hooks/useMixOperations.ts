@@ -78,10 +78,25 @@ export const useMixOperations = ({
       const track1Id = track1Url.split('/').pop() || '';
       const precomputedOps = getMixPrecomputedOps(track1Id);
       
+      // Extract track paths from URLs
+      const track1Path = track1Info?.path || track1Url.replace(API.endpoints.tracks, '');
+      const track2Path = track2Info?.path || track2Url.replace(API.endpoints.tracks, '');
+      
+      // Ensure the track paths look valid
+      if (!track1Path || !track2Path) {
+        throw new Error("Invalid track paths: Could not extract valid paths from URLs");
+      }
+      
+      // Make sure we have the correct API endpoint
+      const mixEndpoint = API.endpoints.mix;
+      if (!mixEndpoint) {
+        throw new Error("Mix endpoint not configured");
+      }
+      
       // Create mix request payload
       const payload = {
-        track1: track1Info?.path || track1Url.replace(API.endpoints.tracks, ''),
-        track2: track2Info?.path || track2Url.replace(API.endpoints.tracks, ''),
+        track1: track1Path,
+        track2: track2Path,
         settings: mixSettings,
         bpm1: track1Features.bpm,
         bpm2: track2Features.bpm,
@@ -100,6 +115,7 @@ export const useMixOperations = ({
       };
       
       console.log("Starting mix with payload:", JSON.stringify(payload, null, 2));
+      console.log("Using mix endpoint:", mixEndpoint);
       
       // Add progress simulation for better UX
       const progressInterval = setInterval(() => {
@@ -110,43 +126,65 @@ export const useMixOperations = ({
       }, 500);
       
       // Start the mix
-      const response = await axios.post(API.endpoints.mix, payload, {
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 10) / progressEvent.total) + 10;
-            setMixProgress(Math.min(percentCompleted, 95));
-          }
-        },
-        timeout: 120000 // Increase timeout to 2 minutes
-      });
-      
-      // Clear progress simulation
-      clearInterval(progressInterval);
-      
-      // Handle successful response
-      setMixProgress(100);
-      
-      console.log("Mix response:", response.data);
-      
-      if (response.data.mixedTrackPath) {
-        const fullUrl = response.data.mixedTrackPath;
-        console.log("Mix successful, track URL:", fullUrl);
-        setMixedTrackUrl(fullUrl);
-        
-        toast({
-          title: "Mix Complete",
-          description: "Your tracks have been mixed successfully!",
+      try {
+        const response = await axios.post(mixEndpoint, payload, {
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round((progressEvent.loaded * 10) / progressEvent.total) + 10;
+              setMixProgress(Math.min(percentCompleted, 95));
+            }
+          },
+          timeout: 120000 // Increase timeout to 2 minutes
         });
-      } else {
-        throw new Error("Missing mixed track URL in response");
+        
+        // Clear progress simulation
+        clearInterval(progressInterval);
+        
+        // Handle successful response
+        setMixProgress(100);
+        
+        console.log("Mix response:", response.data);
+        
+        if (response.data.mixedTrackPath) {
+          const fullUrl = response.data.mixedTrackPath;
+          console.log("Mix successful, track URL:", fullUrl);
+          setMixedTrackUrl(fullUrl);
+          
+          toast({
+            title: "Mix Complete",
+            description: "Your tracks have been mixed successfully!",
+          });
+        } else {
+          throw new Error("Missing mixed track URL in response");
+        }
+        
+        // Store precomputed operations if provided in response
+        if (response.data.precomputedOperations) {
+          cachePrecomputedOps(track1Id, response.data.precomputedOperations);
+        }
+        
+        return true;
+      } catch (axiosError: any) {
+        clearInterval(progressInterval);
+        
+        // Log detailed axios error information
+        console.error("Axios error during mix request:", axiosError);
+        if (axiosError.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          console.error("Response data:", axiosError.response.data);
+          console.error("Response status:", axiosError.response.status);
+          console.error("Response headers:", axiosError.response.headers);
+        } else if (axiosError.request) {
+          // The request was made but no response was received
+          console.error("No response received:", axiosError.request);
+        } else {
+          // Something happened in setting up the request that triggered an Error
+          console.error("Error during request setup:", axiosError.message);
+        }
+        
+        throw axiosError;
       }
-      
-      // Store precomputed operations if provided in response
-      if (response.data.precomputedOperations) {
-        cachePrecomputedOps(track1Id, response.data.precomputedOperations);
-      }
-      
-      return true;
     } catch (error: any) {
       console.error('Mix error:', error);
       

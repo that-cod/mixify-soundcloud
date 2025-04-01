@@ -191,36 +191,92 @@ function startServer() {
   // Mix tracks endpoint
   app.post('/api/mix', async (req, res) => {
     try {
+      console.log("Received mix request");
+      
       const { 
-        track1Path, 
-        track2Path, 
+        track1, 
+        track2, 
         settings,
-        outputFileName = 'mixed-track.mp3'
+        outputFileName = 'mixed-track.mp3',
+        promptAnalysis
       } = req.body;
       
-      if (!track1Path || !track2Path) {
-        return res.status(400).json({ error: 'Both track paths are required' });
+      // Log the request details for debugging
+      console.log("Mix request details:", {
+        track1: track1,
+        track2: track2,
+        settingsProvided: !!settings,
+        outputFileName,
+        promptAnalysisProvided: !!promptAnalysis
+      });
+      
+      if (!track1 || !track2) {
+        console.error("Missing track paths in request");
+        return res.status(400).json({ 
+          error: 'Both track paths are required',
+          details: 'Request must include track1 and track2 paths'
+        });
       }
+      
+      // Resolve track paths
+      const track1Path = track1.startsWith('/') ? track1 : `/${track1}`;
+      const track2Path = track2.startsWith('/') ? track2 : `/${track2}`;
+      
+      // Ensure the files exist
+      const fullTrack1Path = path.join(config.fileStorage.uploadDir, track1Path);
+      const fullTrack2Path = path.join(config.fileStorage.uploadDir, track2Path);
+      
+      if (!fs.existsSync(fullTrack1Path)) {
+        console.error(`Track 1 file not found: ${fullTrack1Path}`);
+        return res.status(404).json({ 
+          error: 'Track 1 file not found', 
+          details: `File does not exist: ${track1Path}`
+        });
+      }
+      
+      if (!fs.existsSync(fullTrack2Path)) {
+        console.error(`Track 2 file not found: ${fullTrack2Path}`);
+        return res.status(404).json({ 
+          error: 'Track 2 file not found', 
+          details: `File does not exist: ${track2Path}`
+        });
+      }
+      
+      console.log("Track files verified to exist");
+      console.log(`Track 1: ${fullTrack1Path}`);
+      console.log(`Track 2: ${fullTrack2Path}`);
       
       // Process mixing asynchronously
       const outputPath = path.join(config.fileStorage.uploadDir, outputFileName);
+      console.log(`Output will be saved to: ${outputPath}`);
       
       // Start mixing process
-      const mixingResult = await mixTracks(
-        track1Path, 
-        track2Path, 
-        settings, 
-        outputPath
-      );
-      
-      res.status(200).json({
-        message: 'Mixing complete',
-        mixedTrackPath: `/api/tracks/${outputFileName}`,
-        mixingDetails: mixingResult
-      });
+      console.log("Starting mixing process...");
+      try {
+        const mixingResult = await mixTracks(
+          fullTrack1Path, 
+          fullTrack2Path, 
+          settings, 
+          outputPath
+        );
+        
+        console.log("Mixing completed successfully:", mixingResult);
+        
+        res.status(200).json({
+          message: 'Mixing complete',
+          mixedTrackPath: `/api/tracks/${outputFileName}`,
+          mixingDetails: mixingResult
+        });
+      } catch (mixingError) {
+        console.error("Error during mixing process:", mixingError);
+        throw new Error(`Mixing process failed: ${mixingError.message}`);
+      }
     } catch (error) {
-      console.error('Mixing error:', error);
-      res.status(500).json({ error: 'Mixing failed', details: error.message });
+      console.error('Mixing endpoint error:', error);
+      res.status(500).json({ 
+        error: 'Mixing failed', 
+        details: error.message || 'An unexpected error occurred during mixing' 
+      });
     }
   });
 

@@ -23,6 +23,8 @@ export function useApiKeyStatus(): ApiKeyStatus {
     try {
       // First check if keys exist
       const keys = getApiKeys();
+      console.log("Retrieved API keys:", keys.openai ? "OpenAI key exists" : "No OpenAI key");
+      
       if (!keys.openai) {
         setStatus({
           openai: { valid: false, message: 'No OpenAI API key provided' },
@@ -31,8 +33,18 @@ export function useApiKeyStatus(): ApiKeyStatus {
         });
         return;
       }
+      
+      // Basic format validation before making API call
+      if (!keys.openai.startsWith('sk-') || keys.openai.length < 40) {
+        setStatus({
+          openai: { valid: false, message: 'OpenAI API key format is invalid' },
+          isChecking: false,
+          error: null
+        });
+        return;
+      }
 
-      console.log("Checking API keys...");
+      console.log("Checking API keys with validation service...");
       const result = await checkApiKeys();
       console.log("API key check result:", result);
       setStatus({
