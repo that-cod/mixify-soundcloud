@@ -26,10 +26,10 @@ async function initStemSeparator() {
     // Check Python environment and dependencies
     const pythonEnv = await checkPythonEnvironment();
     
-    console.log(`Stem separator initialized. Spleeter available: ${pythonEnv.pythonHasSpleeter ? 'Yes' : 'No'}`);
+    console.log(`Stem separator initialized. Demucs available: ${pythonEnv.pythonHasDemucs ? 'Yes' : 'No'}`);
     
-    // If spleeter is not available, use lightweight mode
-    preferLightweightMode = !pythonEnv.pythonHasSpleeter;
+    // If demucs is not available, use lightweight mode
+    preferLightweightMode = !pythonEnv.pythonHasDemucs;
     
     return true;
   } catch (error) {
@@ -93,48 +93,14 @@ async function separateTracks(filePath, options = {}) {
     
     console.log(`Separating stems for ${path.basename(filePath)} (light mode: ${opts.lightMode})`);
     
-    // Choose between simplified or full separation
-    let stemPaths;
-    
-    if (opts.forceSimplified || opts.lightMode) {
-      // Use the lightweight stem separator
-      console.log('Using simplified FFmpeg-based stem separation');
-      stemPaths = await runPythonScriptWithProgress(
-        'simplified_stem_separator.py', 
-        [filePath, opts.outputDir, opts.lightMode.toString()],
-        opts.onProgress
-      );
-    } else {
-      // Use full ML-based stem separation
-      try {
-        if (opts.onProgress) {
-          stemPaths = await runPythonScriptWithProgress(
-            'separate_stems.py', 
-            [filePath, opts.outputDir, opts.lightMode.toString()],
-            opts.onProgress
-          );
-        } else {
-          stemPaths = await runPythonScript(
-            'separate_stems.py', 
-            [filePath, opts.outputDir, opts.lightMode.toString()]
-          );
-        }
-      } catch (pythonError) {
-        console.error('Python stem separation failed, falling back to simplified method:', pythonError);
-        
-        // Fall back to simplified method
-        stemPaths = await runPythonScriptWithProgress(
-          'simplified_stem_separator.py', 
-          [filePath, opts.outputDir, 'true'],
-          opts.onProgress
-        );
-      }
-    }
+    // We'll always use the simplified method now since we're removing Spleeter
+    console.log('Using simplified FFmpeg-based stem separation');
+    const stemPaths = await createSimplifiedStemsWithFFmpeg(filePath, opts.outputDir);
     
     // Verify the stem paths
     const stemPathsValid = validateStemPaths(stemPaths);
     if (!stemPathsValid) {
-      throw new Error("Invalid stem paths returned from Python");
+      throw new Error("Invalid stem paths returned");
     }
     
     // Save to cache if path provided
@@ -152,7 +118,7 @@ async function separateTracks(filePath, options = {}) {
 }
 
 /**
- * Create simplified stems directly using FFmpeg when Python is not available
+ * Create simplified stems directly using FFmpeg
  * @param {string} filePath Path to the audio file
  * @param {string} outputDir Output directory for stems
  * @returns {Promise<Object>} Paths to separated stems

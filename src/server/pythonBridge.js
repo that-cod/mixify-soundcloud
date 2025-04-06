@@ -5,7 +5,7 @@
  * and managing the Python environment.
  */
 
-const { checkPythonEnvironment, getPythonPath, hasSpleeter, hasLibrosa } = require('./python/pythonEnvironment');
+const { checkPythonEnvironment, getPythonPath, hasLibrosa } = require('./python/pythonEnvironment');
 const { runScript, runScriptWithProgress } = require('./python/pythonExecutor');
 const { pathResolver } = require('./utils/systemUtils');
 const fs = require('fs');
@@ -77,7 +77,6 @@ async function isPythonEnvironmentChecked() {
     environmentChecked = true;
     console.log("Python environment status:", {
       pythonPath: pythonEnvironmentStatus.pythonPath ? "Found" : "Not found",
-      hasSpleeter: pythonEnvironmentStatus.pythonHasSpleeter,
       hasLibrosa: pythonEnvironmentStatus.pythonHasLibrosa
     });
     return environmentChecked;

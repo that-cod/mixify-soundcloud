@@ -8,12 +8,8 @@ scipy==1.10.1
 soundfile==0.12.1
 pydub==0.25.1
 
-# Basic stem separation (lighter than Spleeter)
+# Stem separation using Demucs (instead of Spleeter)
 demucs==4.0.0
 
 # Utilities
 tqdm==4.65.0
-typing-extensions==4.5.0
-
-# Memory optimization
-psutil==5.9.5

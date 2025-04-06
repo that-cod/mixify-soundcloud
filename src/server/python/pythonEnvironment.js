@@ -1,4 +1,3 @@
-
 /**
  * Python environment module
  * Handles checking and setting up the Python environment, including dependency installation
@@ -14,7 +13,7 @@ const { spawn } = require('cross-spawn');
 let pythonEnvChecked = false;
 let pythonPath = process.env.PYTHON_PATH || 'python3';
 let pythonHasLibrosa = false;
-let pythonHasSpleeter = false;
+let pythonHasDemucs = false;
 
 /**
  * Check Python environment and available libraries
@@ -25,7 +24,7 @@ async function checkPythonEnvironment() {
     return {
       pythonPath,
       pythonHasLibrosa,
-      pythonHasSpleeter,
+      pythonHasDemucs,
     };
   }
   
@@ -64,7 +63,7 @@ async function checkPythonEnvironment() {
   return {
     pythonPath,
     pythonHasLibrosa,
-    pythonHasSpleeter
+    pythonHasDemucs
   };
 }
 
@@ -81,8 +80,8 @@ import importlib.util
 import json
 
 required_packages = [
-    "librosa", "numpy", "scipy", "spleeter", 
-    "tensorflow", "pydub", "soundfile", "tqdm"
+    "librosa", "numpy", "scipy", "demucs", 
+    "pydub", "soundfile", "tqdm"
 ]
 
 results = {}
@@ -104,16 +103,6 @@ for package in required_packages:
                 results[package]["version"] = "unknown"
         except Exception as e:
             results[package]["error"] = str(e)
-
-# Check tensor flow specifically
-have_gpu = False
-if results.get("tensorflow", {}).get("installed", False):
-    try:
-        import tensorflow as tf
-        have_gpu = len(tf.config.list_physical_devices('GPU')) > 0
-        results["tensorflow"]["gpu_available"] = have_gpu
-    except:
-        results["tensorflow"]["gpu_available"] = False
 
 print(json.dumps(results))
 `;
@@ -154,16 +143,7 @@ print(json.dumps(results))
         
         // Update global variables for key packages
         if (pkg === 'librosa') pythonHasLibrosa = true;
-        if (pkg === 'spleeter') pythonHasSpleeter = true;
-        
-        // Show GPU info for TensorFlow
-        if (pkg === 'tensorflow' && 'gpu_available' in info) {
-          if (info.gpu_available) {
-            console.log(`TensorFlow has GPU support!`);
-          } else {
-            console.log(`TensorFlow is running in CPU-only mode`);
-          }
-        }
+        if (pkg === 'demucs') pythonHasDemucs = true;
       }
     }
     
@@ -204,20 +184,20 @@ async function recheckCriticalPackages() {
     
     console.log(`Librosa available after installation: ${pythonHasLibrosa ? 'Yes' : 'No'}`);
     
-    // Check for spleeter
-    const spleeterResult = await new Promise((resolve) => {
+    // Check for demucs
+    const demucsResult = await new Promise((resolve) => {
       PythonShell.runString(
-        'try:\n  import spleeter\n  print("ok")\nexcept ImportError:\n  print("missing")', 
+        'try:\n  import demucs\n  print("ok")\nexcept ImportError:\n  print("missing")', 
         { pythonPath }, 
         (err, output) => resolve({ err, output })
       );
     });
     
-    pythonHasSpleeter = !spleeterResult.err && 
-                        spleeterResult.output && 
-                        spleeterResult.output.includes('ok');
+    pythonHasDemucs = !demucsResult.err && 
+                     demucsResult.output && 
+                     demucsResult.output.includes('ok');
     
-    console.log(`Spleeter available after installation: ${pythonHasSpleeter ? 'Yes' : 'No'}`);
+    console.log(`Demucs available after installation: ${pythonHasDemucs ? 'Yes' : 'No'}`);
   } catch (err) {
     console.error(`Error rechecking Python packages: ${err}`);
   }
@@ -357,6 +337,6 @@ async function installAllRequiredDependencies() {
 module.exports = {
   checkPythonEnvironment,
   getPythonPath: () => pythonPath,
-  hasSpleeter: () => pythonHasSpleeter,
+  hasDemucs: () => pythonHasDemucs,
   hasLibrosa: () => pythonHasLibrosa
 };
