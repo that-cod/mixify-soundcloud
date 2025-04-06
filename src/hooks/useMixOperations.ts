@@ -82,8 +82,17 @@ export const useMixOperations = ({
       const track1Path = track1Info?.path || track1Url.replace(API.endpoints.tracks, '');
       const track2Path = track2Info?.path || track2Url.replace(API.endpoints.tracks, '');
       
-      // Ensure the track paths look valid
-      if (!track1Path || !track2Path) {
+      // Log the exact paths for debugging
+      console.log("Track 1 info:", track1Info);
+      console.log("Track 2 info:", track2Info);
+      console.log("Extracted track1Path:", track1Path);
+      console.log("Extracted track2Path:", track2Path);
+      
+      // Ensure the track paths look valid and remove leading slashes if present
+      const cleanTrack1Path = track1Path.startsWith('/') ? track1Path.substring(1) : track1Path;
+      const cleanTrack2Path = track2Path.startsWith('/') ? track2Path.substring(1) : track2Path;
+      
+      if (!cleanTrack1Path || !cleanTrack2Path) {
         throw new Error("Invalid track paths: Could not extract valid paths from URLs");
       }
       
@@ -95,8 +104,8 @@ export const useMixOperations = ({
       
       // Create mix request payload
       const payload = {
-        track1: track1Path,
-        track2: track2Path,
+        track1: cleanTrack1Path,
+        track2: cleanTrack2Path,
         settings: mixSettings,
         bpm1: track1Features.bpm,
         bpm2: track2Features.bpm,
@@ -125,7 +134,7 @@ export const useMixOperations = ({
         });
       }, 500);
       
-      // Start the mix
+      // Start the mix with improved request configuration
       try {
         const response = await axios.post(mixEndpoint, payload, {
           onUploadProgress: (progressEvent) => {
@@ -134,7 +143,10 @@ export const useMixOperations = ({
               setMixProgress(Math.min(percentCompleted, 95));
             }
           },
-          timeout: 120000 // Increase timeout to 2 minutes
+          timeout: 180000, // Increase timeout to 3 minutes for large files
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
         
         // Clear progress simulation

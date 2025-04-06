@@ -50,7 +50,13 @@ export const processPromptMix = async (
       apiKey: '***REDACTED***' // Redact API key for logging
     }));
     
-    const response = await axios.post(API.endpoints.processPrompt, payload);
+    // Include specific timeout and headers for better reliability
+    const response = await axios.post(API.endpoints.processPrompt, payload, {
+      timeout: 30000, // 30 second timeout
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
     
     clearInterval(progressInterval);
     onProgress(100);

@@ -8,6 +8,11 @@
 const { checkPythonEnvironment, getPythonPath, hasSpleeter, hasLibrosa } = require('./python/pythonEnvironment');
 const { runScript, runScriptWithProgress } = require('./python/pythonExecutor');
 const { pathResolver } = require('./utils/systemUtils');
+const fs = require('fs');
+const path = require('path');
+
+let environmentChecked = false;
+let pythonEnvironmentStatus = null;
 
 /**
  * Run a Python script with proper error handling
@@ -18,10 +23,18 @@ const { pathResolver } = require('./utils/systemUtils');
  */
 async function runPythonScript(scriptName, args = [], options = {}) {
   // Ensure environment is checked
-  if (!await isPythonEnvironmentChecked()) {
+  if (!environmentChecked) {
     await checkPythonEnvironment();
   }
   
+  // Before running, verify the script exists
+  const scriptPath = path.join(pathResolver.getPythonScriptDir(), scriptName);
+  if (!fs.existsSync(scriptPath)) {
+    console.error(`Python script not found: ${scriptPath}`);
+    throw new Error(`Python script not found: ${scriptName}`);
+  }
+  
+  console.log(`Running Python script: ${scriptName} with args:`, args);
   return runScript(scriptName, args, options, getPythonPath());
 }
 
@@ -35,10 +48,18 @@ async function runPythonScript(scriptName, args = [], options = {}) {
  */
 async function runPythonScriptWithProgress(scriptName, args = [], onProgress = null, options = {}) {
   // Ensure environment is checked
-  if (!await isPythonEnvironmentChecked()) {
+  if (!environmentChecked) {
     await checkPythonEnvironment();
   }
   
+  // Before running, verify the script exists
+  const scriptPath = path.join(pathResolver.getPythonScriptDir(), scriptName);
+  if (!fs.existsSync(scriptPath)) {
+    console.error(`Python script not found: ${scriptPath}`);
+    throw new Error(`Python script not found: ${scriptName}`);
+  }
+  
+  console.log(`Running Python script with progress: ${scriptName} with args:`, args);
   return runScriptWithProgress(scriptName, args, onProgress, options, getPythonPath());
 }
 
@@ -47,9 +68,31 @@ async function runPythonScriptWithProgress(scriptName, args = [], onProgress = n
  * @returns {Promise<boolean>} True if environment has been checked
  */
 async function isPythonEnvironmentChecked() {
-  // Use the exported function to check if the environment has been initialized
-  const env = await checkPythonEnvironment();
-  return env.pythonPath !== undefined;
+  if (environmentChecked) {
+    return true;
+  }
+  
+  try {
+    pythonEnvironmentStatus = await checkPythonEnvironment();
+    environmentChecked = true;
+    console.log("Python environment status:", {
+      pythonPath: pythonEnvironmentStatus.pythonPath ? "Found" : "Not found",
+      hasSpleeter: pythonEnvironmentStatus.pythonHasSpleeter,
+      hasLibrosa: pythonEnvironmentStatus.pythonHasLibrosa
+    });
+    return environmentChecked;
+  } catch (error) {
+    console.error("Failed to check Python environment:", error);
+    return false;
+  }
+}
+
+/**
+ * Gets the current status of the Python environment
+ * @returns {Object|null} Python environment status
+ */
+function getPythonEnvironmentStatus() {
+  return pythonEnvironmentStatus;
 }
 
 // Export the public API
@@ -57,5 +100,7 @@ module.exports = {
   runPythonScript,
   runPythonScriptWithProgress,
   checkPythonEnvironment,
+  isPythonEnvironmentChecked,
+  getPythonEnvironmentStatus,
   getPythonScriptDir: pathResolver.getPythonScriptDir
 };
